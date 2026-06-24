@@ -441,7 +441,7 @@ excludes files the host project needs.
 
 ---
 
-### ADR-009: Five Curated Skills
+### ADR-009: Six Curated Skills
 
 **Context.**
 The toolkit needs an initial set of skills that demonstrate value. Too few
@@ -465,24 +465,28 @@ with &&, template escaping), session management (not learning from past
 sessions), and cost awareness (not tracking token spend).
 
 **Decision.**
-Ship exactly five skills: auto-improve, explore-codebase, git-workflow,
-powershell-patterns, and track-tokens.
+Ship six skills: auto-improve, explore-codebase, git-workflow,
+powershell-patterns, skill-creator, and track-tokens.
 
 **Rationale.**
-These five skills address the areas where AI coding agents most frequently
+These six skills address the areas where AI coding agents most frequently
 need guidance. Explore-codebase saves tokens by teaching efficient search
 strategies. Git-workflow enforces Conventional Commits and atomic commits.
 PowerShell-patterns prevents the most common Windows scripting errors.
-Track-tokens gives visibility into costs. Auto-improve ties them together by
-learning from each session. The total discovery overhead is approximately 500
-tokens (five frontmatter blocks), which is negligible.
+Skill-creator enables the auto-improve loop to create new skills when patterns
+are promoted, and helps developers add skills manually. Track-tokens gives
+visibility into costs. Auto-improve ties them together by learning from each
+session. The total discovery overhead is approximately 600 tokens (six
+frontmatter blocks), which is negligible.
 
 **Consequences.**
-Areas not covered by these five skills (e.g., Docker, Kubernetes, specific
+Areas not covered by these six skills (e.g., Docker, Kubernetes, specific
 testing frameworks) rely on the auto-improve loop to eventually generate new
-skills or memory entries when patterns emerge. This is intentional: the
-toolkit starts lean and grows organically based on actual usage, rather than
-trying to anticipate every need upfront.
+skills or memory entries when patterns emerge. The skill-creator skill ensures
+that when promotion targets a new skill, the creation follows the
+agentskills.io spec and prompt-forge conventions consistently. This is
+intentional: the toolkit starts lean and grows organically based on actual
+usage, rather than trying to anticipate every need upfront.
 
 ---
 

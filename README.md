@@ -50,9 +50,10 @@ standard, plus a cross-session issue registry and optional session tracking.
 | `explore-codebase` | "Where is X?"; "How does Y work?" | 0.7k |
 | `git-workflow` | Committing, branching, reviewing PRs | 0.5k |
 | `powershell-patterns` | Terminal commands, .ps1 scripts, npm on Windows | 0.6k |
+| `skill-creator` | Creating or fixing Agent Skills; auto-improve promotion target | 2.3k |
 | `track-tokens` | "What did this cost?"; "Session stats" | 1.2k |
 
-Total discovery overhead across all five skills is approximately 500 tokens per
+Total discovery overhead across all six skills is approximately 600 tokens per
 session. Skill bodies are loaded only when the conversation context matches the
 skill's description.
 
@@ -87,7 +88,7 @@ Copy these directories into your project root:
 your-project/
 ├── .github/
 │   ├── copilot-instructions.md    Copilot loads this automatically
-│   └── skills/                    5 SKILL.md files
+│   └── skills/                    6 SKILL.md files
 ├── knowledge/
 │   └── issues/                    Registry, template, and issue directories
 └── scripts/                       session-start.ps1, session-end.ps1 (optional)
