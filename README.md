@@ -39,8 +39,9 @@ For a detailed rationale behind every architectural decision, see
 
 ## What You Get
 
-Five Agent Skills following the [agentskills.io](https://agentskills.io)
-standard, plus a cross-session issue registry and optional session tracking.
+Six Agent Skills following the [agentskills.io](https://agentskills.io)
+standard, plus a cross-session issue registry, agent instructions, and optional
+session tracking.
 
 ### Skills
 
@@ -82,26 +83,50 @@ queries VS Code's internal session store directly.
 
 ## Installation
 
-Copy these directories into your project root:
+prompt-forge is organized into provider-specific packages under `packages/`.
+Pick the folder that matches your AI coding agent, copy its contents into your
+project root, and you are done.
 
-```
-your-project/
-├── .github/
-│   ├── copilot-instructions.md    Copilot loads this automatically
-│   └── skills/                    6 SKILL.md files
-├── knowledge/
-│   └── issues/                    Registry, template, and issue directories
-└── scripts/                       session-start.ps1, session-end.ps1 (optional)
-```
-
-Add `.prompt-forge/` to your `.gitignore` (the shipped `.gitignore` in this
-repo contains only that entry and can be merged with yours).
+### Package: Copilot (GitHub Copilot, VS Code)
 
 ```powershell
 git clone https://github.com/pablodiazjorge/prompt-forge.git temp-pf
-Copy-Item -Path temp-pf\.github, temp-pf\knowledge, temp-pf\scripts -Destination .\ -Recurse
+Copy-Item -Path temp-pf\packages\copilot\* -Destination .\ -Recurse
 Remove-Item -Recurse -Force temp-pf
 ```
+
+Copies `.github/skills/`, `.github/copilot-instructions.md`,
+`.github/instructions/`, `knowledge/`, and `scripts/` into your project.
+
+### Package: Claude (Claude Code, Anthropic)
+
+```powershell
+git clone https://github.com/pablodiazjorge/prompt-forge.git temp-pf
+Copy-Item -Path temp-pf\packages\claude\* -Destination .\ -Recurse
+Remove-Item -Recurse -Force temp-pf
+```
+
+Copies `.claude/skills/`, `CLAUDE.md`, `knowledge/`, and `scripts/` into your
+project. Claude discovers skills from `.claude/skills/` and reads `CLAUDE.md`
+as its instruction file.
+
+### Package: Custom (DeepSeek V4, OpenRouter, third-party models)
+
+```powershell
+git clone https://github.com/pablodiazjorge/prompt-forge.git temp-pf
+Copy-Item -Path temp-pf\packages\custom\* -Destination .\ -Recurse
+Remove-Item -Recurse -Force temp-pf
+```
+
+Copies `.github/skills/`, `.github/instructions/`, `knowledge/`, and
+`scripts/` into your project. Does not include `copilot-instructions.md` since
+third-party model providers may not load it. Uses `.instructions.md` format
+which is discovered by VS Code regardless of the model provider.
+
+### After Copying
+
+Add `.prompt-forge/` to your `.gitignore` (the shipped `.gitignore` only
+covers prompt-forge artifacts and can be merged with yours).
 
 ---
 
@@ -142,9 +167,46 @@ All prices in USD per 1M tokens. Last updated: 2026-06-24. Used by
 
 ---
 
+## Project Structure
+
+```
+prompt-forge/
+├── .github/
+│   ├── copilot-instructions.md       Source of truth for Copilot instructions
+│   ├── instructions/
+│   │   └── default.instructions.md   Source of truth for VS Code instructions
+│   └── skills/                       Source of truth for all 6 skills
+├── packages/                         Distribution packages (pick one)
+│   ├── copilot/                      Drop-in for GitHub Copilot / VS Code
+│   │   ├── .github/
+│   │   │   ├── copilot-instructions.md
+│   │   │   ├── instructions/default.instructions.md
+│   │   │   └── skills/  (6 SKILL.md)
+│   │   ├── knowledge/issues/
+│   │   └── scripts/
+│   ├── claude/                       Drop-in for Claude Code / Anthropic
+│   │   ├── .claude/
+│   │   │   └── skills/  (6 SKILL.md)
+│   │   ├── CLAUDE.md
+│   │   ├── knowledge/issues/
+│   │   └── scripts/
+│   └── custom/                       Drop-in for DeepSeek, OpenRouter, etc.
+│       ├── .github/
+│       │   ├── instructions/default.instructions.md
+│       │   └── skills/  (6 SKILL.md)
+│       ├── knowledge/issues/
+│       └── scripts/
+├── knowledge/issues/                 Issue registry template
+├── scripts/                          Session tracking scripts
+└── sync-skills.ps1                   Syncs .github/skills/ → all packages
+```
+
+---
+
 ## Documentation
 
 - [architecture.md](architecture.md) -- Full architectural decision record (10 ADRs, system context, data flow, token economics)
+- [.github/instructions/default.instructions.md](.github/instructions/default.instructions.md) -- Agent instructions (loaded by VS Code on all model providers)
 - [knowledge/issues/INDEX.md](knowledge/issues/INDEX.md) -- Issue registry index and decision criteria
 - [knowledge/issues/TEMPLATE.md](knowledge/issues/TEMPLATE.md) -- Issue template
 

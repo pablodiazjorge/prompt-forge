@@ -26,10 +26,11 @@ own behavior.
 ```
 Host Project
 +------------------------------------------+
-|  .github/skills/   (5 SKILL.md files)    |
-|  knowledge/issues/ (registry + issues)   |
-|  scripts/          (PowerShell utilities) |
-|  .github/copilot-instructions.md         |
+|  .github/skills/          (6 SKILL.md files)    |
+|  .github/instructions/    (agent instructions)  |
+|  knowledge/issues/        (registry + issues)   |
+|  scripts/                 (PowerShell utilities) |
+|  .github/copilot-instructions.md                |
 +------------------------------------------+
          |
          | read & execute on demand
@@ -223,7 +224,7 @@ is relevant.
 **Options considered.**
 
 A. Load all skills eagerly at session start. Simple but wasteful. Every skill
-body (total ~4.3k tokens across all five skills) would be loaded into every
+body (total ~6.8k tokens across all six skills) would be loaded into every
 conversation, even if none are triggered.
 
 B. Keyword-based triggering. The agent scans user messages for keywords and
@@ -239,14 +240,14 @@ a description.
 **Decision.**
 Use description-based progressive disclosure. Each `SKILL.md` contains a
 `description` field in its YAML frontmatter that describes when the skill should
-be loaded. The agent reads all frontmatter blocks (approximately 500 tokens for
-five skills) and loads the body of only the skills whose descriptions match the
+be loaded. The agent reads all frontmatter blocks (approximately 600 tokens for
+six skills) and loads the body of only the skills whose descriptions match the
 current task context.
 
 **Rationale.**
 This is the pattern used by Codex, Claude Code, and the agentskills.io
 standard. It provides the best balance of token efficiency and triggering
-accuracy. Five hundred tokens is negligible compared to the context window of
+accuracy. Six hundred tokens is negligible compared to the context window of
 modern models (1M tokens for DeepSeek V4, Claude Opus 4.8, GPT-5.4). The
 descriptions act as an embedding-free semantic router: the model itself
 determines relevance, which is more accurate than keyword matching.
@@ -384,7 +385,7 @@ across sessions and agents.
 **Decision.**
 Use a category routing table in `INDEX.md` that maps each issue category to a
 promotion target. Categories include `library-api`, `powershell`, `angular`,
-`git`, `project-specific`, and `unknown`. The routing table is co-located with
+`git`, `skill-creation`, `project-specific`, and `unknown`. The routing table is co-located with
 the issue index so it can evolve alongside the issue corpus.
 
 **Rationale.**
@@ -530,6 +531,65 @@ keeping the frontmatter minimal and reviewing skill files during normal code
 review. The `tokens` field, in particular, should be verified periodically
 using a character-counting script as described in the maintenance section
 below.
+
+---
+
+### ADR-011: Provider-Specific Distribution Packages
+
+**Context.**
+Different AI coding agents discover skills and instructions from different
+paths. GitHub Copilot loads skills from `.github/skills/` and instructions from
+`copilot-instructions.md` or `.instructions.md` files. Claude Code loads skills
+from `.claude/skills/` and instructions from `CLAUDE.md` at the project root.
+Third-party model providers (DeepSeek V4 via extensions, OpenRouter) may not
+support `copilot-instructions.md` at all but do support `.instructions.md`
+files discovered by the VS Code agent host.
+
+A single file layout cannot serve all three audiences without requiring the user
+to understand these path differences and manually reorganize files after
+installation, which violates the drop-in principle.
+
+**Options considered.**
+
+A. Single layout with documentation telling users to rearrange files per
+provider. Low maintenance burden but poor user experience. Most users would
+not read the documentation and would end up with skills in the wrong paths.
+
+B. Separate Git branches per provider. Clean per-branch but impossible to
+keep in sync. Changes to a skill would require three separate commits across
+three branches.
+
+C. Monorepo with duplicated skill copies in provider-specific `packages/`
+directories, plus a synchronization script. Each package is a self-contained
+drop-in: the user copies one directory and gets the correct file layout for
+their provider. A PowerShell script keeps the copies in sync from a single
+source of truth.
+
+**Decision.**
+Organize distribution into `packages/copilot/`, `packages/claude/`, and
+`packages/custom/`, each containing a full copy of the skills and the
+appropriate instruction files for that provider. Use `.github/skills/` and
+`.github/instructions/` at the project root as the source of truth. Provide a
+`sync-skills.ps1` script that copies changes from the source of truth to all
+packages.
+
+**Rationale.**
+The user experience is the overriding factor. A developer using Claude Code
+should copy `packages/claude/*` and have everything work without reading about
+VS Code discovery paths. The maintenance cost of triplicated skill files is
+paid by the prompt-forge maintainer, not by every user. The synchronization
+script eliminates the risk of manual copy errors. Provider-specific
+instruction files (`CLAUDE.md`) are maintained directly in their package
+directory since they have no equivalent in other providers.
+
+**Consequences.**
+Adding or editing a skill requires running `sync-skills.ps1` after the change.
+Forgetting to run the script leaves packages out of sync, which is detectable
+by comparing file hashes. The three packages are identical copies for skills
+and shared instructions; only the instruction file format and skill directory
+path differ per provider. The `.gitkeep` files in `knowledge/issues/`
+subdirectories must also be duplicated to ensure Git preserves empty
+directories in each package.
 
 ---
 
