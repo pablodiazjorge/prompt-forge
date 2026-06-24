@@ -123,6 +123,9 @@ Copies `.github/skills/`, `.github/instructions/`, `knowledge/`, and
 third-party model providers may not load it. Uses `.instructions.md` format
 which is discovered by VS Code regardless of the model provider.
 
+**DeepSeek V4 users:** read [DEEPSEEK-SETUP.md](packages/custom/DEEPSEEK-SETUP.md)
+for additional configuration required due to a known bug in the extension.
+
 ### After Copying
 
 Add `.prompt-forge/` to your `.gitignore` (the shipped `.gitignore` only
