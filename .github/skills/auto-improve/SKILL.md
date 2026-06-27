@@ -13,143 +13,35 @@ metadata:
   author: pablodiazjorge
   url: https://github.com/pablodiazjorge/prompt-forge
   version: "1.0"
-  tokens: "1.5k"
+  tokens: "0.4k"
 ---
 
-# Auto-Improve: Post-Session Learning Loop
+# Auto-Improve (Legacy Wrapper)
 
-## Trigger
+> **⚠️ This skill has been split into two specialized roles.**
+> It is retained for backward compatibility with existing references.
+> New sessions should use the individual skills directly.
 
-Run at the END of every significant coding iteration OR when the user explicitly
-requests it. Do NOT run mid-task — wait for a natural stopping point.
+## What Changed
 
-## Algorithm
+The original `auto-improve` skill combined two distinct responsibilities into
+one monolithic workflow. It has been split into:
 
-### Phase 1 — Scan Current Chat
+| Role | Skill | When Loaded | What It Does |
+|------|-------|-------------|--------------|
+| **Developer** | `developer/SKILL.md` | By default (always) | Phases 1-3: scan chat → create/update issues in `open/`. NEVER promotes or touches skills. |
+| **AI Engineer** | `ai-engineer/SKILL.md` | On demand (subagent) | Phases 4-6 + dedup + recategorization: review ALL issues → deduplicate → recategorize → promote to skills/memories → clean stale entries. |
 
-Review the current conversation for these signal types:
+## How to Use
 
-| Signal | Examples | Priority |
-|--------|----------|----------|
-| **Error fixed** | "PowerShell interpretó `{{ }}` mal", "ngx-translate v18 no tiene `forRoot()`" | HIGH |
-| **API discovery** | "`linkedSignal` requires Node ≥22", "`provideZonelessChangeDetection()` is stable in Angular 22" | HIGH |
-| **Workaround found** | "Usa `create_file` en vez de `Set-Content` para templates" | MEDIUM |
-| **Pattern repeated** | Same error occurred 2+ times in this session alone | HIGH |
-| **Project quirk** | "Este monorepo usa npm workspaces", "El `.gitignore` excluye `.github/`" | MEDIUM |
-| **Tool limitation** | "Copilot no expone `usage.prompt_tokens` directamente" | LOW |
-| **User preference** | "Prefiere comandos separados con `;` no `&&`" | MEDIUM |
+- **Everyday tracking**: The `developer` skill is loaded by default. It runs at
+  the end of every iteration, recording issues in `knowledge/issues/open/`. You
+  don't need to do anything — it works automatically.
 
-### Phase 2 — Cross-Reference with Issue Registry
+- **Knowledge cleanup**: When you want to organize accumulated issues, run the
+  `ai-engineer` skill as a subagent. It will review all issues, deduplicate,
+  recategorize, and promote confirmed patterns.
 
-1. **Read `knowledge/issues/INDEX.md`** — get all existing issue IDs, titles, categories
-2. **For each signal from Phase 1**, attempt to match against existing issues:
-   - Match by keyword overlap (title + description)
-   - Match by category + similar error pattern
-   - Use `grep_search` on `knowledge/issues/open/` for related content
-
-### Phase 3 — Create or Update Issues
-
-#### NEW issue (no match found)
-```
-Generate ID: ISSUE-YYYYMMDD-XXXX where XXXX = first 4 hex chars of a UUID
-  PowerShell: [guid]::NewGuid().ToString().Substring(0, 4)
-  Example: ISSUE-20260624-a1b2
-Create knowledge/issues/open/ISSUE-YYYYMMDD-XXXX.md using TEMPLATE.md
-Set occurrences=1, certainty=low, status=open
-Insert a new row into INDEX.md → Open Issues table
-If you have session token data, optionally add it to Evidence section
-```
-IDs are UUID-based — no need to read INDEX.md first. Zero collision risk
-across multiple developers working simultaneously.
-
-#### UPDATE existing issue (match found)
-```
-Increment occurrences by 1
-Update last_seen to today's date
-Append current session info to sessions array
-Re-evaluate certainty:
-  - 1 occurrence → low
-  - 2 occurrences → medium
-  - 3+ occurrences → high
-Update the issue file in open/ using replace_string_in_file
-Update INDEX.md counts
-```
-
-#### INDEX.md merge conflicts
-If two developers add rows to INDEX.md simultaneously, a Git merge
-conflict will occur on the table body. Resolution: keep ALL rows from
-both branches; re-count directories to update Summary numbers.
-
-### Phase 4 — Evaluate Promotion Criteria
-
-For each issue with `certainty: high` (3+ occurrences):
-
-| Category | Promotion Target | Action |
-|----------|-----------------|--------|
-| `library-api` | `/memories/<lib>-api.md` | Check if memory file exists; if so, `str_replace` to add. If not, `create`. |
-| `powershell` | `powershell-patterns/SKILL.md` | `replace_string_in_file` to add new pitfall/pattern. |
-| `angular` | `/memories/` or angular skill | If Angular-specific API version info → user memory. If scaffold pattern → angular-scaffold skill. |
-| `git` | `git-workflow/SKILL.md` | `replace_string_in_file` to add new pattern. |
-| `skill-creation` | New `.github/skills/<name>/SKILL.md` | Load `skill-creator` skill and follow its procedure to create a new skill from scratch. |
-| `project-specific` | `/memories/repo/` | Create or update repo memory file. |
-| `unknown` | — | Do NOT promote. Leave in `open/`. |
-
-After promotion:
-1. Move issue file from `open/` to `promoted/`
-2. Update issue frontmatter: `status: promoted`, add resolution date
-3. Update `INDEX.md`: remove from Open, add to Promoted table
-
-### Phase 5 — Periodic Cleanup
-
-For issues in `open/` with:
-- `occurrences: 1` AND `first_seen > 30 days ago`
-- `certainty: low`
-
-→ Move to `discarded/`, update status to `discarded`, add reason: "Single occurrence, >30 days without recurrence."
-
-### Phase 6 — Report
-
-Output a summary table:
-
-```
-## Auto-Improve Report — 2026-06-24
-
-| Action | ID | Title | Detail |
-|--------|----|-------|--------|
-| 🆕 New | ISSUE-001 | ... | Created in open/ |
-| 📈 Updated | ISSUE-002 | ... | 1→2 occurrences, certainty low→medium |
-| 📦 Promoted | ISSUE-003 | ... | → powershell-patterns/SKILL.md |
-| 🗑️ Discarded | ISSUE-004 | ... | >30 days, single occurrence |
-```
-
-## Important Rules
-
-1. **NEVER create a skill for something the model already knows** — if it's
-   common knowledge (e.g., "use `const` not `var`"), skip it.
-
-2. **ALWAYS get user confirmation before promoting to a skill** — use
-   `vscode_askQuestions` to ask: "I found pattern X occurring 3 times.
-   Promote to a skill?" Unless the user previously said "always auto-promote."
-
-3. **Prefer updating existing skills over creating new ones** — a new pitfall
-   in PowerShell belongs in `powershell-patterns/SKILL.md`, not a new skill.
-
-4. **Keep issue files concise** — the TEMPLATE.md format is the maximum, not
-   the minimum. Don't write essays.
-
-5. **Session isolation** — the `sessions` array in frontmatter stores session
-   UUIDs. Use `session_store_sql` to find the current session UUID if available,
-   otherwise use a date-based identifier.
-
-## File Paths Reference
-
-| Resource | Path |
-|----------|------|
-| Issue registry index | `knowledge/issues/INDEX.md` |
-| Issue template | `knowledge/issues/TEMPLATE.md` |
-| Open issues | `knowledge/issues/open/ISSUE-XXX.md` |
-| Promoted issues | `knowledge/issues/promoted/ISSUE-XXX.md` |
-| Discarded issues | `knowledge/issues/discarded/ISSUE-XXX.md` |
-| User memory | `/memories/<topic>.md` |
-| Repo memory | `/memories/repo/<topic>.md` |
-| Skills | `.github/skills/<name>/SKILL.md` |
+If you're reading this because an old reference triggered `auto-improve`, the
+agent will automatically redirect to `developer` for the current session's
+tracking needs. For promotion and cleanup, invoke `ai-engineer` explicitly.

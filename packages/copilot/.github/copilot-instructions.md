@@ -16,21 +16,25 @@ in order:
    matches, read the FULL `SKILL.md` body for that skill and follow its
    instructions.
 
-4. Skills `explore-codebase`, `git-workflow`, `powershell-patterns`, and
-   `skill-creator` apply to ALL work regardless of the specific task. Load
-   them immediately.
+4. The `developer` skill handles continuous issue tracking and applies to ALL
+   work. Load it immediately. All other skills use progressive disclosure
+   (steps 2-3): read only their frontmatter descriptions and load the full
+   body only when the task matches the description.
 
 5. Run `get_errors()` across the workspace. Fix any existing errors before
    making new changes.
 
 ## During the Session
 
-- Run `auto-improve` at the end of every significant iteration or when the
-  user signals they are done with a task.
+- Run the `developer` skill at the end of every significant iteration or when
+  the user signals they are done with a task. It records issues in
+  `knowledge/issues/open/` but never promotes or modifies skills.
+- Run the `ai-engineer` skill as a subagent when the user asks to organize
+  knowledge, clean up issues, or promote patterns to skills/memories.
 - Run `track-tokens` when the user asks about session cost or token usage.
 - When you encounter an error, API change, or workaround worth remembering,
-  note it mentally. `auto-improve` will formalize it into the issue registry
-  at `knowledge/issues/` after the session.
+  note it mentally. The `developer` skill will formalize it into the issue
+  registry at `knowledge/issues/` after the session.
 
 ## PowerShell (Windows)
 
@@ -59,6 +63,6 @@ Branch naming: `feature/<name>`, `fix/<name>`, `docs/<name>`, `chore/<name>`.
 
 ## After Each Session
 
-1. Run auto-improve to capture learnings into the issue registry.
+1. Run the `developer` skill to capture learnings into the issue registry.
 2. Run track-tokens if the user asks for cost data.
 3. Commit changes to `knowledge/issues/` and any updated skills.

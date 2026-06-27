@@ -62,7 +62,7 @@ Create `.vscode/settings.json` in your project with the following content:
 
 ```json
 {
-  "github.copilot.chat.instructions": "# CRITICAL — Estas instrucciones tienen prioridad maxima. DEBES seguirlas en cada respuesta.\n\n## SESSION STARTUP:\n1. ANTES de responder al usuario, lee los directorios bajo .github/skills/.\n2. Para cada skill, lee el YAML frontmatter (name + description).\n3. Si la tarea del usuario coincide con una descripcion, lee el SKILL.md completo.\n4. Carga SIEMPRE estos skills: explore-codebase, git-workflow, powershell-patterns, skill-creator.\n5. Ejecuta get_errors() en el workspace. Corrige errores existentes ANTES de hacer nuevos cambios.\n\n## DURANTE LA SESION:\n- Ejecuta auto-improve al final de cada iteracion significativa.\n- Ejecuta track-tokens cuando el usuario pregunte por el coste.\n\n## POWERSHELL:\n- Encadena comandos con ';', NUNCA con '&&'.\n- NUNCA uses heredocs @\"...\"@ para archivos con {{ }}. Usa create_file o replace_string_in_file.\n- Ejecuta 'nvm use X.Y.Z' despues de 'nvm install'.\n\n## GIT:\n- Conventional Commits v1.0.0. Un cambio logico por commit.\n- Ramas: feature/<name>, fix/<name>, docs/<name>, chore/<name>.\n\n## TECH STACK:\n- Angular 22 standalone + Signals + Zoneless + Tailwind CSS 4\n- lightweight-charts v5: addSeries(CandlestickSeries, opts), createSeriesMarkers() para markers\n- @ngx-translate v18: provideTranslateService + provideTranslateHttpLoader, sin TranslateModule\n- Dexie.js para cache IndexedDB\n- Web Workers para calculos pesados\n- Vitest para tests"
+  "github.copilot.chat.instructions": "# CRITICAL — Estas instrucciones tienen prioridad maxima. DEBES seguirlas en cada respuesta.\n\n## SESSION STARTUP:\n1. ANTES de responder al usuario, lee los directorios bajo .github/skills/.\n2. Para cada skill, lee el YAML frontmatter (name + description).\n3. Si la tarea del usuario coincide con una descripcion, lee el SKILL.md completo.\n4. Carga SIEMPRE el skill 'developer'.\n5. Ejecuta get_errors() en el workspace. Corrige errores existentes ANTES de hacer nuevos cambios.\n\n## DURANTE LA SESION:\n- Ejecuta el skill 'developer' al final de cada iteracion significativa.\n- Ejecuta track-tokens cuando el usuario pregunte por el coste.\n\n## POWERSHELL:\n- Encadena comandos con ';', NUNCA con '&&'.\n- NUNCA uses heredocs @\"...\"@ para archivos con {{ }}. Usa create_file o replace_string_in_file.\n- Ejecuta 'nvm use X.Y.Z' despues de 'nvm install'.\n\n## GIT:\n- Conventional Commits v1.0.0. Un cambio logico por commit.\n- Ramas: feature/<name>, fix/<name>, docs/<name>, chore/<name>.\n\n## TECH STACK:\n- Angular 22 standalone + Signals + Zoneless + Tailwind CSS 4\n- lightweight-charts v5: addSeries(CandlestickSeries, opts), createSeriesMarkers() para markers\n- @ngx-translate v18: provideTranslateService + provideTranslateHttpLoader, sin TranslateModule\n- Dexie.js para cache IndexedDB\n- Web Workers para calculos pesados\n- Vitest para tests"
 }
 ```
 
@@ -90,7 +90,7 @@ After applying the settings, start a new chat session and check that the agent:
 1. Reads skill frontmatter and loads relevant skills before responding
 2. Runs `get_errors()` at the start of the session
 3. Does not use `&&` in PowerShell commands
-4. Runs `auto-improve` at the end of significant iterations
+4. Runs the `developer` skill at the end of significant iterations
 
 If the agent does none of these things, reload the VS Code window
 (`Ctrl+Shift+P` -> `Developer: Reload Window`). The `github.copilot.chat.instructions`

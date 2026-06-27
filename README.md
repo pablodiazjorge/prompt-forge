@@ -1,6 +1,6 @@
 # prompt-forge
 
-A drop-in toolkit that adds Agent Skills, an auto-improvement loop, and session
+A drop-in toolkit that adds Agent Skills, a learning loop, and session
 tracking to any software project. Copy the files in and your AI coding agent
 gets smarter with every session. No dependencies, no build step, no backend.
 
@@ -39,24 +39,25 @@ For a detailed rationale behind every architectural decision, see
 
 ## What You Get
 
-Six Agent Skills following the [agentskills.io](https://agentskills.io)
-standard, plus a cross-session issue registry, agent instructions, and optional
-session tracking.
+Seven Agent Skills following the [agentskills.io](https://agentskills.io)
+standard, plus a cross-session issue registry, agent instructions, a custom
+agent, and optional session tracking.
 
 ### Skills
 
 | Skill | Triggers when | Body tokens |
 |-------|---------------|-------------|
-| `auto-improve` | End of iteration; "analyze this session" | 1.5k |
+| `developer` | End of iteration; "analyze this session" | 1.2k |
+| `ai-engineer` | On-demand; "organize knowledge", "promote patterns" | 1.8k |
 | `explore-codebase` | "Where is X?"; "How does Y work?" | 0.7k |
 | `git-workflow` | Committing, branching, reviewing PRs | 0.5k |
 | `powershell-patterns` | Terminal commands, .ps1 scripts, npm on Windows | 0.6k |
-| `skill-creator` | Creating or fixing Agent Skills; auto-improve promotion target | 2.3k |
+| `skill-creator` | Creating or fixing Agent Skills; ai-engineer promotion target | 2.3k |
 | `track-tokens` | "What did this cost?"; "Session stats" | 1.2k |
 
-Total discovery overhead across all six skills is approximately 600 tokens per
+Total discovery overhead across all seven skills is approximately 700 tokens per
 session. Skill bodies are loaded only when the conversation context matches the
-skill's description.
+skill's description. Only the `developer` skill is loaded eagerly at startup.
 
 ### Issue Registry
 
@@ -178,25 +179,27 @@ prompt-forge/
 │   ├── copilot-instructions.md       Source of truth for Copilot instructions
 │   ├── instructions/
 │   │   └── default.instructions.md   Source of truth for VS Code instructions
-│   └── skills/                       Source of truth for all 6 skills
+│   ├── agents/                       Custom agents (AI Engineer)
+│   └── skills/                       Source of truth for all 7 skills
 ├── packages/                         Distribution packages (pick one)
 │   ├── copilot/                      Drop-in for GitHub Copilot / VS Code
 │   │   ├── .github/
 │   │   │   ├── copilot-instructions.md
 │   │   │   ├── instructions/default.instructions.md
-│   │   │   └── skills/  (6 SKILL.md)
+│   │   │   ├── agents/   (AI Engineer agent)
+│   │   │   └── skills/   (7 SKILL.md)
 │   │   ├── knowledge/issues/
 │   │   └── scripts/
 │   ├── claude/                       Drop-in for Claude Code / Anthropic
 │   │   ├── .claude/
-│   │   │   └── skills/  (6 SKILL.md)
+│   │   │   └── skills/   (7 SKILL.md)
 │   │   ├── CLAUDE.md
 │   │   ├── knowledge/issues/
 │   │   └── scripts/
 │   └── custom/                       Drop-in for DeepSeek, OpenRouter, etc.
 │       ├── .github/
 │       │   ├── instructions/default.instructions.md
-│       │   └── skills/  (6 SKILL.md)
+│       │   └── skills/   (7 SKILL.md)
 │       ├── knowledge/issues/
 │       └── scripts/
 ├── knowledge/issues/                 Issue registry template
@@ -208,7 +211,7 @@ prompt-forge/
 
 ## Documentation
 
-- [architecture.md](architecture.md) -- Full architectural decision record (10 ADRs, system context, data flow, token economics)
+- [architecture.md](architecture.md) -- Full architectural decision record (11 ADRs, system context, data flow, token economics)
 - [.github/instructions/default.instructions.md](.github/instructions/default.instructions.md) -- Agent instructions (loaded by VS Code on all model providers)
 - [knowledge/issues/INDEX.md](knowledge/issues/INDEX.md) -- Issue registry index and decision criteria
 - [knowledge/issues/TEMPLATE.md](knowledge/issues/TEMPLATE.md) -- Issue template

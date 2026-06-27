@@ -3,7 +3,7 @@ name: skill-creator
 description: |
   Create, update, review, fix, or debug Agent Skills following the agentskills.io
   specification and prompt-forge conventions. Use when the user wants to add a
-  new skill, improve an existing skill, or when auto-improve promotes an issue
+  new skill, improve an existing skill, or when ai-engineer promotes an issue
   to a new skill. Covers frontmatter format, description writing, body structure,
   token estimation, and progressive disclosure patterns.
 license: MIT
@@ -21,7 +21,7 @@ metadata:
 Activate this skill when:
 
 - The user asks to create, add, or write a new Agent Skill
-- The auto-improve loop promotes an issue and the routing table says to create
+- The ai-engineer promotes an issue and the routing table says to create
   a new skill
 - An existing skill needs its frontmatter fixed, its description improved, or
   its body restructured
@@ -110,7 +110,7 @@ description: |
   Create, update, review, fix, or debug Agent Skills following the
   agentskills.io specification and prompt-forge conventions. Use when
   the user wants to add a new skill, improve an existing skill, or when
-  auto-improve promotes an issue to a new skill. Covers frontmatter
+  ai-engineer promotes an issue to a new skill. Covers frontmatter
   format, description writing, body structure, token estimation, and
   progressive disclosure patterns.
 ```

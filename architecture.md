@@ -3,7 +3,7 @@
 ## Purpose and Scope
 
 This document describes the architecture of prompt-forge, a drop-in toolkit that
-adds Agent Skills, an auto-improvement loop, and session tracking to any
+adds Agent Skills, a learning loop, and session tracking to any
 software project. It is written for contributors and maintainers who need to
 understand why the system is shaped the way it is, and for users evaluating
 whether prompt-forge fits their development workflow.
@@ -26,7 +26,8 @@ own behavior.
 ```
 Host Project
 +------------------------------------------+
-|  .github/skills/          (6 SKILL.md files)    |
+|  .github/skills/          (7 SKILL.md files)    |
+|  .github/agents/          (custom agents)       |
 |  .github/instructions/    (agent instructions)  |
 |  knowledge/issues/        (registry + issues)   |
 |  scripts/                 (PowerShell utilities) |
@@ -131,7 +132,7 @@ keeping the frontmatter minimal.
 ### ADR-002: Filesystem-Based Issue Registry
 
 **Context.**
-The auto-improvement loop needs persistent storage for tracking issues across
+The learning loop needs persistent storage for tracking issues across
 sessions. Issues must survive agent restarts, be shareable across developers,
 and integrate with existing development workflows.
 
@@ -201,7 +202,7 @@ machine that runs VS Code. Its JSON handling is excellent for structured
 logging. The scripts are intentionally kept under 100 lines each so they are
 easy to audit and modify. The trade-off is that these scripts do not run on
 macOS or Linux without installing PowerShell Core, but the toolkit's core
-functionality (skills, issue registry, auto-improve) is platform-independent
+functionality (skills, issue registry, developer) is platform-independent
 Markdown; the scripts are an optional Windows bonus.
 
 **Consequences.**
@@ -259,8 +260,8 @@ when irrelevant (wasting tokens) or not loaded when needed (missing the
 opportunity to help). This is mitigated by keeping descriptions concise and
 specific. The `tokens` field in frontmatter helps the agent decide whether the
 skill is worth loading: a 0.5k skill like git-workflow can be loaded eagerly
-with minimal cost, while a 1.5k skill like auto-improve should be loaded only
-when the user explicitly signals session-end or review.
+with minimal cost, while a 1.8k skill like ai-engineer should be loaded only
+when the user explicitly requests knowledge organization.
 
 ---
 
@@ -271,7 +272,7 @@ The issue registry assigns an identifier to each issue. The initial design used
 sequential numeric IDs (ISSUE-001, ISSUE-002). This created two problems: first,
 the agent had to read `INDEX.md` to determine the next available number, adding
 a token cost to every issue creation. Second, and more critically, two
-developers running auto-improve simultaneously would both read the same highest
+developers running the developer skill simultaneously would both read the same highest
 ID, both create a file with the same name, and produce a Git conflict.
 
 **Options considered.**
@@ -319,7 +320,7 @@ both branches.
 ### ADR-006: Three-Occurrence Promotion Threshold
 
 **Context.**
-The auto-improve loop detects patterns -- errors, API changes, workarounds -- and
+The learning loop detects patterns -- errors, API changes, workarounds -- and
 promotes confirmed patterns to persistent knowledge (skills or memory files).
 A threshold is needed to separate genuine patterns from noise.
 
@@ -353,7 +354,7 @@ A genuine pattern must occur three times before it is promoted. This means the
 first two occurrences still cost tokens and developer time. However, the
 alternative -- promoting prematurely -- would pollute the skill system with
 noise, making skills less trustworthy and ultimately less useful. The
-auto-improve skill's Phase 5 periodic cleanup automatically discards low-
+ai-engineer's cleanup phase automatically discards low-
 certainty issues older than 30 days, preventing the registry from accumulating
 stale single-occurrence entries.
 
@@ -442,7 +443,7 @@ excludes files the host project needs.
 
 ---
 
-### ADR-009: Six Curated Skills
+### ADR-009: Curated Skills with Role Separation
 
 **Context.**
 The toolkit needs an initial set of skills that demonstrate value. Too few
@@ -465,29 +466,44 @@ agents: codebase exploration (reading too many files), Git operations
 with &&, template escaping), session management (not learning from past
 sessions), and cost awareness (not tracking token spend).
 
-**Decision.**
+**Decision (original).**
 Ship six skills: auto-improve, explore-codebase, git-workflow,
 powershell-patterns, skill-creator, and track-tokens.
 
+**Evolution (2026-06-27).**
+The original monolithic `auto-improve` skill was split into two specialized
+roles: `developer` (always-loaded, handles issue tracking — phases 1-3) and
+`ai-engineer` (on-demand subagent, handles promotion, deduplication, and
+cleanup — phases 4-6). This separation follows the principle of least
+privilege: the always-loaded skill is safe and non-destructive; the
+destructive operations require explicit invocation.
+
+**Current skill set (7 skills):**
+`developer`, `ai-engineer`, `explore-codebase`, `git-workflow`,
+`powershell-patterns`, `skill-creator`, `track-tokens`.
+
 **Rationale.**
-These six skills address the areas where AI coding agents most frequently
+These seven skills address the areas where AI coding agents most frequently
 need guidance. Explore-codebase saves tokens by teaching efficient search
 strategies. Git-workflow enforces Conventional Commits and atomic commits.
 PowerShell-patterns prevents the most common Windows scripting errors.
-Skill-creator enables the auto-improve loop to create new skills when patterns
+Skill-creator enables the ai-engineer to create new skills when patterns
 are promoted, and helps developers add skills manually. Track-tokens gives
-visibility into costs. Auto-improve ties them together by learning from each
-session. The total discovery overhead is approximately 600 tokens (six
+visibility into costs. Developer and ai-engineer form a two-tier learning
+loop: developer records issues passively, ai-engineer curates them actively.
+The total discovery overhead is approximately 700 tokens (seven
 frontmatter blocks), which is negligible.
 
 **Consequences.**
-Areas not covered by these six skills (e.g., Docker, Kubernetes, specific
-testing frameworks) rely on the auto-improve loop to eventually generate new
+Areas not covered by these seven skills (e.g., Docker, Kubernetes, specific
+testing frameworks) rely on the learning loop to eventually generate new
 skills or memory entries when patterns emerge. The skill-creator skill ensures
 that when promotion targets a new skill, the creation follows the
-agentskills.io spec and prompt-forge conventions consistently. This is
-intentional: the toolkit starts lean and grows organically based on actual
-usage, rather than trying to anticipate every need upfront.
+agentskills.io spec and prompt-forge conventions consistently. The role
+separation means promotion is always a conscious decision (via ai-engineer),
+never an automatic side effect of session tracking. This is intentional: the
+toolkit starts lean and grows organically based on actual usage, rather than
+trying to anticipate every need upfront.
 
 ---
 
@@ -658,32 +674,42 @@ unavailable.
 
 ---
 
-## Data Flow: The Auto-Improve Cycle
+## Data Flow: The Learning Cycle
 
-A complete auto-improve cycle spans three phases:
+The learning cycle is split across two roles — `developer` (recording) and
+`ai-engineer` (curation) — and spans up to six phases:
 
-**Phase 1: Detection (during session).**
+**Phase 1 — Detection (during session).**
 As the developer works, the AI agent encounters errors, discovers API changes,
 or finds workarounds. The agent notes these mentally. The base skills
 (explore-codebase, git-workflow, powershell-patterns) provide immediate
 guidance to resolve the current problem.
 
-**Phase 2: Recording (end of session).**
-When the developer ends the session or explicitly invokes auto-improve, the
-skill scans the conversation for signals. Each signal is cross-referenced with
-existing issues in `open/`. New signals create new issue files. Existing signals
-increment occurrence counts and update certainty levels.
+**Phase 2 — Cross-Reference (end of session, developer).**
+The `developer` skill scans the conversation for signals and cross-references
+each against existing issues in `open/` via keyword overlap.
 
-**Phase 3: Promotion (any session).**
-When an issue reaches three occurrences, the auto-improve skill evaluates it
-against the promotion criteria. If the category has a routing target, the issue
-is promoted: the issue file moves to `promoted/`, and the knowledge is encoded
-in the target location (a skill file, a memory file, or a repo note).
+**Phase 3 — Recording (end of session, developer).**
+New signals create new issue files in `open/`. Existing signals increment
+occurrence counts and update certainty levels. The `developer` skill never
+promotes — it only records.
 
-The cycle is intentionally asynchronous. Detection and recording can happen in
-different sessions. Promotion can happen days or weeks after the first
-occurrence. This decoupling means the system does not need to be "always on";
-it accumulates knowledge passively as developers work normally.
+**Phase 4 — Curation (on-demand, ai-engineer).**
+The `ai-engineer` subagent reviews ALL issues — deduplicating similar entries,
+recategorizing unknowns, and evaluating promotion candidates (3+ occurrences).
+
+**Phase 5 — Promotion (on-demand, ai-engineer).**
+Confirmed patterns are promoted to their target: skills, user memory, or repo
+memory. The issue file moves from `open/` to `promoted/`.
+
+**Phase 6 — Cleanup (on-demand, ai-engineer).**
+Stale single-occurrence issues (>30 days) are discarded. Re-emerging discarded
+patterns are re-evaluated.
+
+The cycle is intentionally asynchronous and two-tier. Recording (developer)
+happens automatically at session end. Curation (ai-engineer) happens only when
+explicitly invoked. This decoupling means the system does not need to be
+"always on"; it accumulates knowledge passively and curates actively.
 
 ---
 
@@ -693,14 +719,14 @@ The token cost of prompt-forge breaks down into three components:
 
 ```
 Component                  Token cost          When incurred
-Skill discovery            5 x ~100 = ~500     Start of every session
-Skill body (if triggered)  ~500-1,500 each     On first trigger per session
-Auto-improve scan          Variable            End of session (explicit)
+Skill discovery            7 x ~100 = ~700     Start of every session
+Skill body (if triggered)  ~500-1,800 each     On first trigger per session
+Developer scan             Variable            End of session (explicit)
 ```
 
-The discovery cost of 500 tokens is a fixed overhead per session. In a session
-that consumes 50,000 input tokens, this represents 1% overhead. If the
-auto-improve skill runs at session end, it scans the full conversation, which
+The discovery cost of 700 tokens is a fixed overhead per session. In a session
+that consumes 50,000 input tokens, this represents ~1.4% overhead. If the
+developer skill runs at session end, it scans the full conversation, which
 may cost several thousand additional tokens. However, this cost is amortized
 across future sessions that benefit from the promoted knowledge.
 
@@ -725,10 +751,10 @@ the directories to update summary numbers. This is a manual step but a trivial
 one.
 
 Skill files are modified less frequently than `INDEX.md`, but the same merge
-logic applies. When auto-improve promotes an issue to a skill, it uses
+logic applies. When ai-engineer promotes an issue to a skill, it uses
 `replace_string_in_file` to add a new section. If two developers promote to the
 same skill simultaneously, the second promotion will see a stale file and need
-to re-read before editing. The auto-improve skill instructs the agent to always
+to re-read before editing. The ai-engineer skill instructs the agent to always
 read the current file state before editing, which mitigates but does not
 eliminate this race condition.
 
@@ -765,10 +791,11 @@ serial per developer, so this is unlikely to occur. The merge-time conflict
 resolution instructions handle the Git-level case.
 
 **No automated issue deduplication.**
-The auto-improve skill uses keyword overlap and category matching to detect
-duplicate issues, but this is heuristic. Two issues describing the same
+The developer skill uses keyword overlap and category matching to detect
+duplicate issues (Phase 2), but this is heuristic. Two issues describing the same
 underlying problem with different wording may be created as separate files.
-Manual deduplication during code review is the safety net.
+The ai-engineer skill provides a second pass with its deduplication phase,
+but manual review during code review remains the safety net.
 
 **Token estimates are approximate.**
 The `tokens` field in skill frontmatter uses the 4-characters-per-token

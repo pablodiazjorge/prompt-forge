@@ -8,6 +8,8 @@ sessions: []
 category: "unknown"
 status: "open"
 certainty: "low"
+created_by: ""
+reviewed_by: ""
 ---
 
 ## Description
