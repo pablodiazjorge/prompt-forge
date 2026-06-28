@@ -218,10 +218,6 @@ prompt-forge/
 
 ---
 
-## Author
-
-pablodiazjorge -- [github.com/pablodiazjorge/prompt-forge](https://github.com/pablodiazjorge/prompt-forge)
-
 ## License
 
-MIT
+This project's code is licensed under the [MIT License](LICENSE).
