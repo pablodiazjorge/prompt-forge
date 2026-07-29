@@ -39,9 +39,9 @@ For a detailed rationale behind every architectural decision, see
 
 ## What You Get
 
-Seven Agent Skills following the [agentskills.io](https://agentskills.io)
-standard, plus a cross-session issue registry, agent instructions, a custom
-agent, and optional session tracking.
+Six Agent Skills following the [agentskills.io](https://agentskills.io)
+standard, plus a cross-session issue registry, agent instructions, and a custom
+agent.
 
 ### Skills
 
@@ -53,9 +53,8 @@ agent, and optional session tracking.
 | `git-workflow` | Committing, branching, reviewing PRs | 0.5k |
 | `powershell-patterns` | Terminal commands, .ps1 scripts, npm on Windows | 0.6k |
 | `skill-creator` | Creating or fixing Agent Skills; ai-engineer promotion target | 2.3k |
-| `track-tokens` | "What did this cost?"; "Session stats" | 1.2k |
 
-Total discovery overhead across all seven skills is approximately 700 tokens per
+Total discovery overhead across all six skills is approximately 700 tokens per
 session. Skill bodies are loaded only when the conversation context matches the
 skill's description. Only the `developer` skill is loaded eagerly at startup.
 
@@ -77,8 +76,7 @@ coordination.
 ### Session Tracking (Optional)
 
 PowerShell scripts that log token usage and estimate costs across six AI
-providers. The `track-tokens` skill provides a cross-platform alternative that
-queries VS Code's internal session store directly.
+providers.
 
 ---
 
@@ -137,7 +135,7 @@ covers prompt-forge artifacts and can be merged with yours).
 ## AI Model Pricing Reference
 
 All prices in USD per 1M tokens. Last updated: 2026-06-24. Used by
-`session-end.ps1` and the `track-tokens` skill.
+`session-end.ps1`.
 
 | Provider / Model | Input | Output | Cached |
 |------------------|-------|--------|--------|

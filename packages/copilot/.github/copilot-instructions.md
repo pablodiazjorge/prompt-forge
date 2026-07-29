@@ -31,7 +31,6 @@ in order:
   `knowledge/issues/open/` but never promotes or modifies skills.
 - Run the `ai-engineer` skill as a subagent when the user asks to organize
   knowledge, clean up issues, or promote patterns to skills/memories.
-- Run `track-tokens` when the user asks about session cost or token usage.
 - When you encounter an error, API change, or workaround worth remembering,
   note it mentally. The `developer` skill will formalize it into the issue
   registry at `knowledge/issues/` after the session.
@@ -64,5 +63,4 @@ Branch naming: `feature/<name>`, `fix/<name>`, `docs/<name>`, `chore/<name>`.
 ## After Each Session
 
 1. Run the `developer` skill to capture learnings into the issue registry.
-2. Run track-tokens if the user asks for cost data.
-3. Commit changes to `knowledge/issues/` and any updated skills.
+2. Commit changes to `knowledge/issues/` and any updated skills.

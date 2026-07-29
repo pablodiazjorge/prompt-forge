@@ -29,7 +29,6 @@ At the start of every session, before doing anything else:
   skills.
 - Run the `ai-engineer` skill as a subagent when the user asks to organize
   knowledge, clean up issues, or promote patterns to skills/memories.
-- Run `track-tokens` when the user asks about session cost.
 - Note errors, API changes, and workarounds mentally. The `developer` skill
   formalizes them into `knowledge/issues/` after the session.
 
@@ -48,5 +47,4 @@ Branch naming: `feature/<name>`, `fix/<name>`, `docs/<name>`, `chore/<name>`.
 ## After Each Session
 
 1. Run the `developer` skill to capture learnings.
-2. Run track-tokens if the user asks for cost data.
-3. Commit changes to `knowledge/issues/` and any updated skills.
+2. Commit changes to `knowledge/issues/` and any updated skills.

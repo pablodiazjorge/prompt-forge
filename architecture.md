@@ -207,10 +207,8 @@ Markdown; the scripts are an optional Windows bonus.
 
 **Consequences.**
 Cross-platform users on macOS/Linux cannot use the session tracking scripts
-without installing PowerShell Core. The `track-tokens` skill provides an
-alternative: it queries VS Code's internal session store directly, which works
-on all platforms. The scripts remain the recommended approach for Windows users
-who want cumulative cost tracking across sessions.
+without installing PowerShell Core. The scripts remain the recommended approach
+for Windows users who want cumulative cost tracking across sessions.
 
 ---
 
@@ -467,8 +465,8 @@ with &&, template escaping), session management (not learning from past
 sessions), and cost awareness (not tracking token spend).
 
 **Decision (original).**
-Ship six skills: auto-improve, explore-codebase, git-workflow,
-powershell-patterns, skill-creator, and track-tokens.
+Ship five skills: auto-improve, explore-codebase, git-workflow,
+powershell-patterns, and skill-creator.
 
 **Evolution (2026-06-27).**
 The original monolithic `auto-improve` skill was split into two specialized
@@ -478,24 +476,23 @@ cleanup — phases 4-6). This separation follows the principle of least
 privilege: the always-loaded skill is safe and non-destructive; the
 destructive operations require explicit invocation.
 
-**Current skill set (7 skills):**
+**Current skill set (6 skills):**
 `developer`, `ai-engineer`, `explore-codebase`, `git-workflow`,
-`powershell-patterns`, `skill-creator`, `track-tokens`.
+`powershell-patterns`, `skill-creator`.
 
 **Rationale.**
-These seven skills address the areas where AI coding agents most frequently
+These six skills address the areas where AI coding agents most frequently
 need guidance. Explore-codebase saves tokens by teaching efficient search
 strategies. Git-workflow enforces Conventional Commits and atomic commits.
 PowerShell-patterns prevents the most common Windows scripting errors.
 Skill-creator enables the ai-engineer to create new skills when patterns
-are promoted, and helps developers add skills manually. Track-tokens gives
-visibility into costs. Developer and ai-engineer form a two-tier learning
-loop: developer records issues passively, ai-engineer curates them actively.
-The total discovery overhead is approximately 700 tokens (seven
-frontmatter blocks), which is negligible.
+are promoted, and helps developers add skills manually. Developer and
+aI-engineer form a two-tier learning loop: developer records issues
+passively, ai-engineer curates them actively. The total discovery overhead
+is approximately 600 tokens (six frontmatter blocks), which is negligible.
 
 **Consequences.**
-Areas not covered by these seven skills (e.g., Docker, Kubernetes, specific
+Areas not covered by these six skills (e.g., Docker, Kubernetes, specific
 testing frameworks) rely on the learning loop to eventually generate new
 skills or memory entries when patterns emerge. The skill-creator skill ensures
 that when promotion targets a new skill, the creation follows the
@@ -655,9 +652,8 @@ It can be extended by editing `INDEX.md` directly.
 
 ### Session Tracking (Optional Subsystem)
 
-The session tracking subsystem consists of two PowerShell scripts and the
-`track-tokens` skill. The scripts are optional; the toolkit functions fully
-without them.
+The session tracking subsystem consists of two PowerShell scripts.
+The scripts are optional; the toolkit functions fully without them.
 
 `session-start.ps1` creates a JSON log file in `.prompt-forge/logs/` with
 metadata about the session start (timestamp, hostname, user, working directory).
@@ -666,11 +662,6 @@ It exports a session ID as an environment variable.
 `session-end.ps1` reads the session ID from the environment, calculates cost
 based on token counts and provider pricing, updates the session log file, and
 appends to a cumulative JSONL log. It prints a formatted report to the console.
-
-The `track-tokens` skill provides an alternative path: it queries VS Code's
-internal session store directly, which works cross-platform and does not require
-PowerShell. It also provides the estimation logic when exact token counts are
-unavailable.
 
 ---
 

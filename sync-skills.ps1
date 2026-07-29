@@ -18,7 +18,7 @@ Write-Host ""
 # individual skills. Adding a new skill directory is enough; it will be
 # synced automatically. Currently synced: developer, ai-engineer,
 # explore-codebase, git-workflow,
-# powershell-patterns, skill-creator, track-tokens.
+# powershell-patterns, skill-creator.
 
 $skillsSource = "$root\.github\skills"
 
