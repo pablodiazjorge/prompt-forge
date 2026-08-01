@@ -120,5 +120,4 @@ without any additional configuration.
 │   └── default.instructions.md      ← Full instruction file (loaded by VS Code)
 └── skills/                          ← 6 SKILL.md files
 knowledge/issues/                    ← Issue registry
-scripts/                             ← Session tracking (optional)
 ```

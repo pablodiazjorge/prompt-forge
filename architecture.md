@@ -3,7 +3,7 @@
 ## Purpose and Scope
 
 This document describes the architecture of prompt-forge, a drop-in toolkit that
-adds Agent Skills, a learning loop, and session tracking to any
+adds Agent Skills and a learning loop to any
 software project. It is written for contributors and maintainers who need to
 understand why the system is shaped the way it is, and for users evaluating
 whether prompt-forge fits their development workflow.
@@ -26,11 +26,10 @@ own behavior.
 ```
 Host Project
 +------------------------------------------+
-|  .github/skills/          (7 SKILL.md files)    |
+|  .github/skills/          (6 SKILL.md files)    |
 |  .github/agents/          (custom agents)       |
 |  .github/instructions/    (agent instructions)  |
 |  knowledge/issues/        (registry + issues)   |
-|  scripts/                 (PowerShell utilities) |
 |  .github/copilot-instructions.md                |
 +------------------------------------------+
          |
@@ -171,9 +170,15 @@ compared to database migration failures or API rate limits.
 
 ---
 
-### ADR-003: PowerShell for Session Scripts
+### ADR-003: PowerShell for Session Scripts ~~(Retired)~~
 
-**Context.**
+> **Status: Retired (2026-08-01).** The session tracking scripts
+> (`session-start.ps1`, `session-end.ps1`) were removed as part of the
+> `tokenTracker` cleanup. Token counting is not reliably exposed by current
+> AI coding agent APIs, making automated tracking impractical. The ADR is
+> preserved for historical reference.
+
+**Context (original).**
 Token tracking requires scripts that create log files and read environment
 variables. These scripts are optional; the toolkit works without them. They must
 run on Windows without additional installations.
@@ -223,7 +228,7 @@ is relevant.
 **Options considered.**
 
 A. Load all skills eagerly at session start. Simple but wasteful. Every skill
-body (total ~6.8k tokens across all six skills) would be loaded into every
+body (total ~7.1k tokens across all six skills) would be loaded into every
 conversation, even if none are triggered.
 
 B. Keyword-based triggering. The agent scans user messages for keywords and
@@ -487,7 +492,7 @@ strategies. Git-workflow enforces Conventional Commits and atomic commits.
 PowerShell-patterns prevents the most common Windows scripting errors.
 Skill-creator enables the ai-engineer to create new skills when patterns
 are promoted, and helps developers add skills manually. Developer and
-aI-engineer form a two-tier learning loop: developer records issues
+ai-engineer form a two-tier learning loop: developer records issues
 passively, ai-engineer curates them actively. The total discovery overhead
 is approximately 600 tokens (six frontmatter blocks), which is negligible.
 
@@ -498,7 +503,7 @@ skills or memory entries when patterns emerge. The skill-creator skill ensures
 that when promotion targets a new skill, the creation follows the
 agentskills.io spec and prompt-forge conventions consistently. The role
 separation means promotion is always a conscious decision (via ai-engineer),
-never an automatic side effect of session tracking. This is intentional: the
+never an automatic side effect of issue recording. This is intentional: the
 toolkit starts lean and grows organically based on actual usage, rather than
 trying to anticipate every need upfront.
 
@@ -650,25 +655,46 @@ The promotion routing table in `INDEX.md` maps issue categories to promotion
 targets. This table is the single source of truth for where knowledge ends up.
 It can be extended by editing `INDEX.md` directly.
 
-### Session Tracking (Optional Subsystem)
-
-The session tracking subsystem consists of two PowerShell scripts.
-The scripts are optional; the toolkit functions fully without them.
-
-`session-start.ps1` creates a JSON log file in `.prompt-forge/logs/` with
-metadata about the session start (timestamp, hostname, user, working directory).
-It exports a session ID as an environment variable.
-
-`session-end.ps1` reads the session ID from the environment, calculates cost
-based on token counts and provider pricing, updates the session log file, and
-appends to a cumulative JSONL log. It prints a formatted report to the console.
-
 ---
 
 ## Data Flow: The Learning Cycle
 
-The learning cycle is split across two roles — `developer` (recording) and
-`ai-engineer` (curation) — and spans up to six phases:
+The learning cycle is composed of two roles — `developer` (recording) and
+`ai-engineer` (curation) — spanning six phases:
+
+```mermaid
+flowchart TD
+    subgraph Automatic["Every Session — Automatic"]
+        A["Coding Session"] --> B["developer skill
+(always loaded)"]
+        B --> C["Phase 1: Detection
+(errors, APIs, workarounds)"]
+        C --> D["Phase 2: Cross-Reference
+(match against open/)"]
+        D --> E["Phase 3: Recording
+(create/update issues in open/)"]
+    end
+
+    subgraph Manual["Periodic — Manual Invocation"]
+        F["User: 'organize knowledge'"] --> G["ai-engineer subagent
+(on-demand)"]
+        G --> H["Phase 4: Curation
+(deduplicate + recategorize)"]
+        H --> I{"Phase 5: certainty=high
+AND 3+ occurrences?"}
+        I -->|Yes| J["Promote to skill or memory
+(move to promoted/)"]
+        I -->|No| K{"Phase 6: >30 days
+AND 1 occurrence?"}
+        K -->|Yes| L["Discard
+(move to discarded/)"]
+        K -->|No| M["Leave in open/
+(wait for more evidence)"]
+    end
+
+    E -.->|"Accumulates issues
+over time"| F
+```
 
 **Phase 1 — Detection (during session).**
 As the developer works, the AI agent encounters errors, discovers API changes,
@@ -710,12 +736,12 @@ The token cost of prompt-forge breaks down into three components:
 
 ```
 Component                  Token cost          When incurred
-Skill discovery            7 x ~100 = ~700     Start of every session
+Skill discovery            6 x ~100 = ~600     Start of every session
 Skill body (if triggered)  ~500-1,800 each     On first trigger per session
 Developer scan             Variable            End of session (explicit)
 ```
 
-The discovery cost of 700 tokens is a fixed overhead per session. In a session
+The discovery cost of 600 tokens is a fixed overhead per session. In a session
 that consumes 50,000 input tokens, this represents ~1.4% overhead. If the
 developer skill runs at session end, it scans the full conversation, which
 may cost several thousand additional tokens. However, this cost is amortized
@@ -754,11 +780,9 @@ eliminate this race condition.
 ## Security Considerations
 
 prompt-forge does not handle secrets, credentials, or user data. The session
-tracking scripts log the current working directory path and the Windows
-username, which could be considered sensitive in some environments. The log
-files are written to `.prompt-forge/logs/`, which is excluded from version
-control by the shipped `.gitignore`. Users in high-security environments should
-audit the scripts before use.
+The `.gitkeep` files in `knowledge/issues/` subdirectories are inert
+placeholders that ensure Git preserves empty directories. No sensitive data
+is stored in the repository.
 
 The skills instruct the AI agent to read, write, and edit files within the
 project. This is the agent's normal mode of operation; the skills do not grant
@@ -768,11 +792,6 @@ requests or execute code outside the project boundary.
 ---
 
 ## Known Limitations
-
-**Platform dependency.**
-The PowerShell session tracking scripts require Windows with PowerShell 5.1 or
-PowerShell Core on macOS/Linux. The core skills and issue registry are
-platform-independent.
 
 **No concurrent write safety.**
 The filesystem-based issue registry has no locking mechanism. Two agents

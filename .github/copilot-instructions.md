@@ -43,6 +43,7 @@ not explicitly triggered:
 - Chain commands with `;`, never `&&`.
 - Never use `@"..."@` heredocs for files containing `{{ }}`. Use the
   `create_file` or `replace_string_in_file` tools instead.
+- `nvm use X.Y.Z` after `nvm install`. It does not auto-activate.
 
 ## Git
 

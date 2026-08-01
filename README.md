@@ -54,7 +54,7 @@ agent.
 | `powershell-patterns` | Terminal commands, .ps1 scripts, npm on Windows | 0.6k |
 | `skill-creator` | Creating or fixing Agent Skills; ai-engineer promotion target | 2.3k |
 
-Total discovery overhead across all six skills is approximately 700 tokens per
+Total discovery overhead across all six skills is approximately 600 tokens per
 session. Skill bodies are loaded only when the conversation context matches the
 skill's description. Only the `developer` skill is loaded eagerly at startup.
 
@@ -73,11 +73,6 @@ Issue IDs use a collision-free format (`ISSUE-YYYYMMDD-XXXX`) designed for
 multi-developer teams. Two developers can create issues simultaneously without
 coordination.
 
-### Session Tracking (Optional)
-
-PowerShell scripts that log token usage and estimate costs across six AI
-providers.
-
 ---
 
 ## Installation
@@ -95,7 +90,7 @@ Remove-Item -Recurse -Force temp-pf
 ```
 
 Copies `.github/skills/`, `.github/copilot-instructions.md`,
-`.github/instructions/`, `knowledge/`, and `scripts/` into your project.
+`.github/instructions/`, and `knowledge/` into your project.
 
 ### Package: Claude (Claude Code, Anthropic)
 
@@ -105,7 +100,7 @@ Copy-Item -Path temp-pf\packages\claude\* -Destination .\ -Recurse
 Remove-Item -Recurse -Force temp-pf
 ```
 
-Copies `.claude/skills/`, `CLAUDE.md`, `knowledge/`, and `scripts/` into your
+Copies `.claude/skills/`, `CLAUDE.md`, and `knowledge/` into your
 project. Claude discovers skills from `.claude/skills/` and reads `CLAUDE.md`
 as its instruction file.
 
@@ -117,8 +112,8 @@ Copy-Item -Path temp-pf\packages\custom\* -Destination .\ -Recurse
 Remove-Item -Recurse -Force temp-pf
 ```
 
-Copies `.github/skills/`, `.github/instructions/`, `knowledge/`, and
-`scripts/` into your project. Does not include `copilot-instructions.md` since
+Copies `.github/skills/`, `.github/instructions/`, and `knowledge/`
+into your project. Does not include `copilot-instructions.md` since
 third-party model providers may not load it. Uses `.instructions.md` format
 which is discovered by VS Code regardless of the model provider.
 
@@ -132,43 +127,6 @@ covers prompt-forge artifacts and can be merged with yours).
 
 ---
 
-## AI Model Pricing Reference
-
-All prices in USD per 1M tokens. Last updated: 2026-06-24. Used by
-`session-end.ps1`.
-
-| Provider / Model | Input | Output | Cached |
-|------------------|-------|--------|--------|
-| **OpenAI** | | | |
-| GPT-5.5 | $5.00 | $30.00 | $0.50 |
-| GPT-5.4 | $2.50 | $15.00 | $0.25 |
-| GPT-5.4 Mini | $0.75 | $4.50 | $0.075 |
-| **Anthropic** | | | |
-| Claude Fable 5 | $10.00 | $50.00 | $1.00 |
-| Claude Opus 4.8 | $5.00 | $25.00 | $0.50 |
-| Claude Sonnet 4.6 | $3.00 | $15.00 | $0.30 |
-| Claude Haiku 4.5 | $1.00 | $5.00 | $0.10 |
-| **DeepSeek** | | | |
-| V4 Flash | $0.14 | $0.28 | $0.003 |
-| V4 Pro | $0.44 | $0.87 | $0.004 |
-| **Kimi / Moonshot** | | | |
-| K2.7 Code | $0.90 | $3.73 | $0.18 |
-| K2.6 | $0.90 | $3.73 | $0.15 |
-| **MiniMax** | | | |
-| M3 | $0.30 | $1.20 | $0.06 |
-| M2.7 | $0.30 | $1.20 | $0.06 |
-
-### GitHub Copilot Plans
-
-| Plan | Price/month | Includes |
-|------|-------------|----------|
-| Free | $0 | 2K completions, Haiku 4.5 + GPT-5 Mini |
-| Pro | $10 | Unlimited, Cloud agent, model selection, $15 credits |
-| Pro+ | $39 | Premium models (Opus), 4x usage, $70 credits |
-| Max | $100 | Priority access, 2.9x usage vs Pro+, $200 credits |
-
----
-
 ## Project Structure
 
 ```
@@ -178,30 +136,26 @@ prompt-forge/
 │   ├── instructions/
 │   │   └── default.instructions.md   Source of truth for VS Code instructions
 │   ├── agents/                       Custom agents (AI Engineer)
-│   └── skills/                       Source of truth for all 7 skills
+│   └── skills/                       Source of truth for all 6 skills
 ├── packages/                         Distribution packages (pick one)
 │   ├── copilot/                      Drop-in for GitHub Copilot / VS Code
 │   │   ├── .github/
 │   │   │   ├── copilot-instructions.md
 │   │   │   ├── instructions/default.instructions.md
 │   │   │   ├── agents/   (AI Engineer agent)
-│   │   │   └── skills/   (7 SKILL.md)
+│   │   │   └── skills/   (6 SKILL.md)
 │   │   ├── knowledge/issues/
-│   │   └── scripts/
 │   ├── claude/                       Drop-in for Claude Code / Anthropic
 │   │   ├── .claude/
-│   │   │   └── skills/   (7 SKILL.md)
+│   │   │   └── skills/   (6 SKILL.md)
 │   │   ├── CLAUDE.md
-│   │   ├── knowledge/issues/
-│   │   └── scripts/
+│   │   └── knowledge/issues/
 │   └── custom/                       Drop-in for DeepSeek, OpenRouter, etc.
 │       ├── .github/
 │       │   ├── instructions/default.instructions.md
-│       │   └── skills/   (7 SKILL.md)
-│       ├── knowledge/issues/
-│       └── scripts/
+│       │   └── skills/   (6 SKILL.md)
+│       └── knowledge/issues/
 ├── knowledge/issues/                 Issue registry template
-├── scripts/                          Session tracking scripts
 └── sync-skills.ps1                   Syncs .github/skills/ → all packages
 ```
 
@@ -210,6 +164,7 @@ prompt-forge/
 ## Documentation
 
 - [architecture.md](architecture.md) -- Full architectural decision record (11 ADRs, system context, data flow, token economics)
+- [knowledge/strategy.md](knowledge/strategy.md) -- Knowledge strategy: two-tier learning loop, industry comparison, promotion pipeline
 - [.github/instructions/default.instructions.md](.github/instructions/default.instructions.md) -- Agent instructions (loaded by VS Code on all model providers)
 - [knowledge/issues/INDEX.md](knowledge/issues/INDEX.md) -- Issue registry index and decision criteria
 - [knowledge/issues/TEMPLATE.md](knowledge/issues/TEMPLATE.md) -- Issue template

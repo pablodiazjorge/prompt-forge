@@ -70,5 +70,6 @@
 | `powershell` | `powershell-patterns/SKILL.md` |
 | `angular` | `/memories/` or angular skill |
 | `git` | `git-workflow/SKILL.md` |
+| `skill-creation` | New `.github/skills/<name>/SKILL.md` |
 | `project-specific` | `/memories/repo/` |
 | `unknown` | Stay in `open/` until category clarified |
