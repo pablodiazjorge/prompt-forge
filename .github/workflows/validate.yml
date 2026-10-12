@@ -48,6 +48,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-      - name: Run installer tests
-        shell: ${{ matrix.shell }}
+      # `shell` does not accept expressions, so each edition gets its own step.
+      - name: Run installer tests (Windows PowerShell 5.1)
+        if: matrix.shell == 'powershell'
+        shell: powershell
+        run: ./scripts/test-install.ps1
+      - name: Run installer tests (PowerShell 7)
+        if: matrix.shell == 'pwsh'
+        shell: pwsh
         run: ./scripts/test-install.ps1
