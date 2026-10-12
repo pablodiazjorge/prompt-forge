@@ -54,6 +54,10 @@ Once per sprint, a rotating steward:
 
 Expect a few minutes when there is little to do.
 
+Once a quarter, the steward also prunes: run your agent's instruction audit over
+`AGENTS.md`, the skills, and `knowledge/memory/` (in Claude Code,
+`/doctor prompt-audit`), and accept the deletions it can justify.
+
 ## Tuning
 
 Thresholds and budgets live in `knowledge/README.md`, and the curator reads them

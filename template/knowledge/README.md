@@ -52,6 +52,23 @@ every line in it costs tokens in every future task.
 3. **Memory entry** in `memory/<topic>.md`.
 4. **Team skill** in `.agents/skills/<name>/`, for multi-step procedures only.
 
+## Keep it small
+
+Frontier models need fewer instructions, not more. Anthropic removed over 80% of
+Claude Code's own system prompt for its Claude 5 generation models with no
+measurable loss on its coding evaluations, and found it had also been
+overconstraining Claude through `CLAUDE.md` files and skills
+([source](https://claude.dev/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models/)).
+Every skill and memory line has to keep earning its place:
+
+- When a curation run adds memory, look for something to remove in the same run.
+- Delete the shipped skills your team does not use. The loop needs only
+  `record-lesson` and `curate-lessons`, and upgrades do not bring deleted skills
+  back.
+- Once a quarter, run your agent's instruction audit over `AGENTS.md`, the
+  skills, and `knowledge/memory/` (in Claude Code, `/doctor prompt-audit`), and
+  accept the deletions it can justify.
+
 ## Rules for every agent and every reviewer
 
 - Lessons paraphrase. No raw logs, stack traces, prompts, or file contents.

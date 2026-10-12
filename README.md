@@ -174,8 +174,8 @@ CLAUDE.md, GEMINI.md              one line: @AGENTS.md (merged into yours)
 .agents/skills/                   the skills, for most agents
   record-lesson/                    writes candidate lessons
   curate-lessons/                   promotes them through a pull request
-  git-workflow/                     non-interactive git and commit conventions
-  powershell-patterns/              Windows PowerShell 5.1 and 7 pitfalls
+  git-workflow/                     optional: non-interactive git and commit conventions
+  powershell-patterns/              optional: Windows PowerShell 5.1 and 7 pitfalls
 .claude/skills/                   identical copy: Claude Code reads only this path
 .claude/agents/curate-lessons.md  runs curation in its own context
 knowledge/
@@ -183,6 +183,14 @@ knowledge/
   lessons/                          candidates
   memory/                           verified team facts
 ```
+
+**Less is more.** Frontier models need fewer instructions, not more. Anthropic
+removed over 80% of Claude Code's own system prompt for its Claude 5 generation
+models with no measurable loss on its coding evaluations
+([source](https://claude.dev/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models/)).
+The loop needs only `record-lesson` and `curate-lessons`. Delete the optional
+skills if your agents do not need them; the installer will not bring them back.
+The team policy in `knowledge/README.md` asks curators to prune as they add.
 
 Discovery costs about 100 tokens per skill. Bodies load only when a task matches:
 `record-lesson` is about 1.1k tokens and `curate-lessons` about 1.6k.
