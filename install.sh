@@ -18,7 +18,10 @@ set -eu
 VERSION="2.0.0"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 SRC="$SCRIPT_DIR/template"
-SKILLS="record-lesson curate-lessons git-workflow powershell-patterns"
+# The loop needs the core skills; optional ones are installed once and, if a team
+# deletes them, stay deleted on later runs and upgrades.
+CORE_SKILLS="record-lesson curate-lessons"
+OPTIONAL_SKILLS="git-workflow powershell-patterns"
 # Paths that prompt-forge 1.x installed. Reported, never deleted.
 LEGACY=".github/skills/developer .github/skills/ai-engineer .github/skills/explore-codebase .github/skills/skill-creator .github/skills/track-tokens .github/skills/git-workflow .github/skills/powershell-patterns .github/agents/ai-engineer.agent.md .github/instructions/default.instructions.md .claude/skills/developer .claude/skills/ai-engineer .claude/skills/explore-codebase .claude/skills/skill-creator .claude/skills/track-tokens .claude/agents/ai-engineer.md knowledge/issues scripts/session-start.ps1 scripts/session-end.ps1 DEEPSEEK-SETUP.md .prompt-forge"
 
@@ -163,16 +166,32 @@ merge_import() {
   fi
 }
 
+# A first install is one where no core skill exists yet in either location.
+fresh=1
+for d in .agents/skills .claude/skills; do
+  if [ -e "$target/$d/record-lesson" ]; then fresh=0; fi
+done
+
+install_skill() {
+  s=$1; optional=$2
+  for d in .agents/skills .claude/skills; do
+    if [ "$d" = ".claude/skills" ] && [ "$skip_claude" -eq 1 ]; then continue; fi
+    if [ "$optional" -eq 1 ] && [ "$fresh" -eq 0 ] && [ ! -e "$target/$d/$s" ]; then
+      say skipped "$d/$s/ (optional, not installed; copy it from template/ to add it)"
+      continue
+    fi
+    install_dir "$SRC/$d/$s" "$d/$s"
+  done
+}
+
 echo "Instructions"
 merge_agents_md
 [ "$skip_claude" -eq 1 ] || merge_import CLAUDE.md
 [ "$skip_gemini" -eq 1 ] || merge_import GEMINI.md
 
 echo "Skills"
-for s in $SKILLS; do
-  install_dir "$SRC/.agents/skills/$s" ".agents/skills/$s"
-  [ "$skip_claude" -eq 1 ] || install_dir "$SRC/.claude/skills/$s" ".claude/skills/$s"
-done
+for s in $CORE_SKILLS; do install_skill "$s" 0; done
+for s in $OPTIONAL_SKILLS; do install_skill "$s" 1; done
 [ "$skip_claude" -eq 1 ] || install_file "$SRC/.claude/agents/curate-lessons.md" ".claude/agents/curate-lessons.md" 1
 
 echo "Knowledge"

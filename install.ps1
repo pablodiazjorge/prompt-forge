@@ -29,7 +29,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $Version = '2.0.0'
 $Src     = Join-Path $PSScriptRoot 'template'
-$Skills  = @('record-lesson', 'curate-lessons', 'git-workflow', 'powershell-patterns')
+# The loop needs the core skills; optional ones are installed once and, if a team
+# deletes them, stay deleted on later runs and upgrades.
+$CoreSkills     = @('record-lesson', 'curate-lessons')
+$OptionalSkills = @('git-workflow', 'powershell-patterns')
 # Paths that prompt-forge 1.x installed. Reported, never deleted.
 $Legacy  = @(
     '.github/skills/developer', '.github/skills/ai-engineer', '.github/skills/explore-codebase',
@@ -210,11 +213,24 @@ Merge-AgentsMd
 if (-not $SkipClaude) { Merge-Import 'CLAUDE.md' }
 if (-not $SkipGemini) { Merge-Import 'GEMINI.md' }
 
-Write-Host 'Skills'
-foreach ($s in $Skills) {
-    Install-Dir (Join-Path $Src ".agents/skills/$s") ".agents/skills/$s"
-    if (-not $SkipClaude) { Install-Dir (Join-Path $Src ".claude/skills/$s") ".claude/skills/$s" }
+# A first install is one where no core skill exists yet in either location.
+$fresh = -not ((Test-Path -LiteralPath (Join-Path $Target '.agents/skills/record-lesson')) -or
+               (Test-Path -LiteralPath (Join-Path $Target '.claude/skills/record-lesson')))
+
+function Install-Skill([string]$Name, [bool]$Optional) {
+    foreach ($d in '.agents/skills', '.claude/skills') {
+        if ($d -eq '.claude/skills' -and $SkipClaude) { continue }
+        if ($Optional -and -not $fresh -and -not (Test-Path -LiteralPath (Join-Path $Target "$d/$Name"))) {
+            Say 'skipped' "$d/$Name/ (optional, not installed; copy it from template/ to add it)"
+            continue
+        }
+        Install-Dir (Join-Path $Src "$d/$Name") "$d/$Name"
+    }
 }
+
+Write-Host 'Skills'
+foreach ($s in $CoreSkills)     { Install-Skill $s $false }
+foreach ($s in $OptionalSkills) { Install-Skill $s $true }
 if (-not $SkipClaude) {
     Install-File (Join-Path $Src '.claude/agents/curate-lessons.md') '.claude/agents/curate-lessons.md' $true
 }
