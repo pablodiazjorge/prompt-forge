@@ -15,7 +15,7 @@
 
 set -eu
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 SRC="$SCRIPT_DIR/template"
 # The loop needs the core skills; optional ones are installed once and, if a team

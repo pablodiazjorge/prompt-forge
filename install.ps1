@@ -27,7 +27,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '2.0.0'
+$Version = '2.1.0'
 $Src     = Join-Path $PSScriptRoot 'template'
 # The loop needs the core skills; optional ones are installed once and, if a team
 # deletes them, stay deleted on later runs and upgrades.

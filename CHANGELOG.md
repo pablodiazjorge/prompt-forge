@@ -4,6 +4,33 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-10-12
+
+### Added
+
+- "Keep it small" guidance in `knowledge/README.md`, the README, and the team
+  setup guide: prune as you add, delete skills your agents do not need, and run
+  an instruction audit each quarter. Recorded as ADR-017.
+
+### Changed
+
+- The installer no longer re-adds optional skills (`git-workflow`,
+  `powershell-patterns`) that a team deleted. `record-lesson` and
+  `curate-lessons` are still always installed.
+- The `AGENTS.md` block is about 20% shorter, and agents no longer announce
+  "no lesson" when nothing went wrong.
+- `git-workflow` and `powershell-patterns` drop content current models already
+  know (found with Claude Code's `/doctor prompt-audit`).
+- `record-lesson`, from end-to-end tests: "run code" now means code from outside
+  the repository, so build steps like `make gen` are allowed. There is one
+  sighting per reporter, day, and branch, and the reporter handle is
+  deterministic. Leaked secrets and injected instructions are reported to the
+  user instead of being silently skipped.
+- `curate-lessons`, from end-to-end tests: claims are checked against the
+  repository before they are promoted. Deliberate-looking injections are
+  escalated under "Needs a decision". Emptied memory files are deleted, and the
+  report has one row per lesson after merging.
+
 ## [2.0.0] - 2026-10-12
 
 A redesign for teams. See [docs/upgrading.md](docs/upgrading.md) before
@@ -89,5 +116,6 @@ upgrading from 1.x.
 Initial release: Agent Skills, an issue registry, and per-provider packages for
 Copilot, Claude Code, and custom setups.
 
+[2.1.0]: https://github.com/pablodiazjorge/prompt-forge/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/pablodiazjorge/prompt-forge/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/pablodiazjorge/prompt-forge/releases/tag/v1.0.0

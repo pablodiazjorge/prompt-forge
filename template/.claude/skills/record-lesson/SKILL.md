@@ -5,7 +5,7 @@ license: MIT
 metadata:
   author: pablodiazjorge
   url: https://github.com/pablodiazjorge/prompt-forge
-  version: "2.0.0"
+  version: "2.1.0"
   tokens: "1.1k"
 ---
 
