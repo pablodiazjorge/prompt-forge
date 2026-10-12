@@ -14,7 +14,7 @@ considered, the decision, and its consequences. Superseded decisions stay in the
 log with a status line, so the reasoning behind the current design remains
 traceable.
 
-The sections before the decision log describe the design as of 2.0.0.
+The sections before the decision log describe the design as of 2.1.0.
 
 ---
 
@@ -87,7 +87,7 @@ second source.
 
 ---
 
-## Current Design (2.0)
+## Current Design (2.1)
 
 ### Components
 
@@ -123,7 +123,7 @@ flowchart LR
 | Cost | Size | When |
 |---|---|---|
 | Skill discovery | ~100 tokens per skill, ~400 in total | Every session, by the agent's own skill loader |
-| `AGENTS.md` block | ~300 tokens | Every session |
+| `AGENTS.md` block | ~250 tokens | Every session |
 | `record-lesson` body | ~1.1k tokens | Only when a lesson is worth recording |
 | `curate-lessons` body | ~1.6k tokens | Only in a curation run, ideally in a subagent |
 | `knowledge/memory/` | Budgeted at ~2k tokens in total; agents read only matching files | Per task |
@@ -994,6 +994,35 @@ Four skills instead of six. The registry was empty in every known installation,
 so this was the cheapest moment to rename. Upgraders follow
 [docs/upgrading.md](docs/upgrading.md); the installer lists 1.x leftovers rather
 than deleting them.
+
+---
+
+### ADR-017: Keep the Installed Environment Small
+
+> **Status: Accepted (2026-10-12).** Amends ADR-014 and ADR-016.
+
+**Context.**
+Anthropic reported removing over 80% of Claude Code's own system prompt for its
+Claude 5 generation models with no measurable loss on its coding evaluations,
+and that it had been overconstraining Claude through `CLAUDE.md` files and
+skills as well
+([source](https://claude.dev/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models/)).
+Running `/doctor prompt-audit` over the 2.0.0 skills flagged text that current
+models already know. Meanwhile the installer recreated any shipped skill a team
+had deleted, so a team that pruned would see its deletions undone on upgrade.
+
+**Decision.**
+`record-lesson` and `curate-lessons` are core and always installed.
+`git-workflow` and `powershell-patterns` are optional: installed on a first
+install, then only updated if still present, so deleted skills stay deleted. The
+team policy in `knowledge/README.md` asks curators to remove as they add and to
+run an instruction audit each quarter. Shipped skills and the `AGENTS.md` block
+were trimmed of content the audit and end-to-end tests showed to be redundant.
+
+**Consequences.**
+A team can shrink its install without fighting the installer. Re-adding an
+optional skill means copying it from `template/`. The guidance costs nothing in
+ordinary sessions, because only the curator reads `knowledge/README.md`.
 
 ---
 

@@ -66,6 +66,16 @@ try {
     Run @('-Target', $p)
     Check 'reported as current'               { $script:out -match 'current +\.agents/skills/git-workflow/' }
 
+    Write-Host 'deleted optional skills stay deleted; core skills come back'
+    foreach ($d in "$p/.agents/skills/powershell-patterns", "$p/.claude/skills/powershell-patterns", "$p/.agents/skills/record-lesson") {
+        Remove-Item -LiteralPath $d -Recurse -Force
+    }
+    Run @('-Target', $p, '-Upgrade')
+    Check 'optional skill not re-added'       { -not (Test-Path "$p/.agents/skills/powershell-patterns") -and -not (Test-Path "$p/.claude/skills/powershell-patterns") }
+    Check 'skip reported'                     { $script:out -match 'skipped .*powershell-patterns' }
+    Check 'core skill restored'               { Test-Path "$p/.agents/skills/record-lesson/SKILL.md" }
+    Check 'other optional skill kept'         { Test-Path "$p/.agents/skills/git-workflow/SKILL.md" }
+
     Write-Host 'a start marker without an end marker is refused'
     $p = New-Project 'broken'
     $broken = "# X`n<!-- prompt-forge:start -->`nold text`n"

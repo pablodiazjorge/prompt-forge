@@ -46,7 +46,9 @@ The description is all an agent sees when it decides whether to load the skill.
 
 - Add only what the agent lacks: project conventions, non-obvious steps, and
   gotchas. Do not explain what the agent already knows.
-- Prefer a procedure (numbered steps, a checklist) to a list of facts.
+- Match specificity to fragility: numbered steps where order matters or a
+  mistake is costly; for judgment calls, state the goal, the constraints, and
+  how to check the result.
 - Give one default; mention an alternative only when it is genuinely needed.
 - Keep the body under 500 lines and 5,000 tokens. Move long reference material
   to `references/<topic>.md`, one level deep, and say when to read it.

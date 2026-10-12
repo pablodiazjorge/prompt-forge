@@ -5,8 +5,8 @@ license: MIT
 metadata:
   author: pablodiazjorge
   url: https://github.com/pablodiazjorge/prompt-forge
-  version: "2.0.0"
-  tokens: "0.9k"
+  version: "2.1.0"
+  tokens: "0.8k"
   sources: "https://www.conventionalcommits.org/en/v1.0.0/, https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional, https://git-scm.com/docs"
 ---
 
@@ -47,25 +47,10 @@ out.
 
 One logical change per commit, staged by path.
 
-The [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)
-format:
-
-```
-<type>[optional scope][!]: <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-The specification itself defines only `feat` (a minor release) and `fix` (a
-patch release), plus breaking changes, marked with `!` before the colon or a
-`BREAKING CHANGE:` footer (a major release). Every other type is a team
-convention. The common set, from `@commitlint/config-conventional`, is
-`build`, `chore`, `ci`, `docs`, `perf`, `refactor`, `revert`, `style`, and
-`test`. Release tools differ on whether these bump a version (semantic-release's
-defaults, for example, release a patch for `perf` and for reverts), so check the
-project's release configuration rather than assuming.
+Default to [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)
+with the `@commitlint/config-conventional` types. Whether a type other than
+`feat` or `fix` triggers a release depends on the project's release tool, so
+check its configuration rather than assuming.
 
 ## Branches
 

@@ -5,8 +5,8 @@ license: MIT
 metadata:
   author: pablodiazjorge
   url: https://github.com/pablodiazjorge/prompt-forge
-  version: "2.0.0"
-  tokens: "1.7k"
+  version: "2.1.0"
+  tokens: "1.6k"
   sources: "https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_parsing, https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_character_encoding, https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_preference_variables, https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_execution_policies"
 ---
 
@@ -152,16 +152,7 @@ transfers:
 3. Verify the binary that actually resolves, not the manager's report:
    `(Get-Command node).Source; node --version`.
 
-## Unix equivalents
-
-| Unix | PowerShell |
-|---|---|
-| `head -n N` / `tail -n N` | `Get-Content f -TotalCount N` / `-Tail N`; piped: `Select-Object -First N` / `-Last N` |
-| `which x` | `(Get-Command x).Source` |
-| `wc -l` | `(Get-Content f \| Measure-Object -Line).Lines` |
-| `mkdir -p` | `New-Item -ItemType Directory -Force p` |
-| `rm -rf` | `Remove-Item -Recurse -Force p` |
-| `grep -r x .` | `Get-ChildItem -Recurse -File \| Select-String -Pattern x` |
+## Habits
 
 Prefer full cmdlet names over aliases in scripts, and cap long output with
 `Select-Object -First N`.
