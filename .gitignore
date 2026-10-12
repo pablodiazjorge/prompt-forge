@@ -1,5 +1,15 @@
-# ── prompt-forge (drop-in toolkit for AI coding enhancement) ──
-# This file only covers prompt-forge's own artifacts.
-# Your project should have its own .gitignore for build output, deps, IDE, etc.
+# prompt-forge ships no runtime artifacts, so this file covers only this
+# repository's own local cruft. Nothing here is copied into host projects.
 
-.prompt-forge/
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+
+# Local agent state for whoever maintains this repository. The shipped
+# template/.claude/ directory is not affected: these patterns are anchored.
+/.claude/
+/CLAUDE.local.md

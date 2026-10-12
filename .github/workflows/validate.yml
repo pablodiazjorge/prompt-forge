@@ -1,0 +1,59 @@
+name: validate
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  template:
+    name: Skills, links and template drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Template copy is in sync
+        shell: pwsh
+        run: ./scripts/sync-template.ps1 -Check
+      - name: Skills and links are valid
+        shell: pwsh
+        run: ./scripts/validate.ps1
+
+  install-bash:
+    name: install.sh (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        # On Windows this is Git Bash, the environment Windows users run install.sh in.
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/test-install.sh
+
+  install-powershell:
+    name: install.ps1 (${{ matrix.shell }} on ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, shell: powershell }
+          - { os: windows-latest, shell: pwsh }
+          - { os: ubuntu-latest, shell: pwsh }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      # `shell` does not accept expressions, so each edition gets its own step.
+      - name: Run installer tests (Windows PowerShell 5.1)
+        if: matrix.shell == 'powershell'
+        shell: powershell
+        run: ./scripts/test-install.ps1
+      - name: Run installer tests (PowerShell 7)
+        if: matrix.shell == 'pwsh'
+        shell: pwsh
+        run: ./scripts/test-install.ps1
