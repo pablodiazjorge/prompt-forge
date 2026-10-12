@@ -72,9 +72,9 @@ git add src/models/            # Stage specific directory
 
 ## PR Splitting (Stacked PRs)
 
-1. **PR 1 (base):** Models, interfaces, types
-2. **PR 2 (logic):** Services, state management
-3. **PR 3 (UI):** Components, templates, styles
+1. **PR 1 (base):** Models, interfaces, types, schema
+2. **PR 2 (logic):** Services, business rules, state
+3. **PR 3 (surface):** The delivery layer — HTTP handlers, CLI commands, or UI
 4. **PR 4 (tests):** Unit/integration tests
 
 Each PR compiles independently. **Squash-based workflow**: lead maintainer cleans commit messages on merge.

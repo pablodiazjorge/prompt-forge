@@ -9,68 +9,76 @@ license: MIT
 metadata:
   author: pablodiazjorge
   url: https://github.com/pablodiazjorge/prompt-forge
-  version: "1.3"
-  tokens: "0.7k"
-  sources: "simonwillison.net, github.com/openai/codex, code.visualstudio.com/api"
+  version: "2.0"
+  tokens: "0.8k"
+  sources: "simonwillison.net, github.com/openai/codex, agentskills.io"
 ---
 
 # Codebase Exploration Playbook
 
+## Agent Capabilities, Not Tool Names
+
+Every agent exposes the same five capabilities under different names. This skill
+refers to them by capability; use whichever your harness provides.
+
+| Capability | Known as |
+|---|---|
+| **content search** | `Grep`, `grep_search`, `rg`, `search_file_content` |
+| **glob search** | `Glob`, `file_search`, `find_files` |
+| **semantic search** | `semantic_search`, `codebase_search` — absent in some agents |
+| **read a range** | `Read`, `read_file`, `view` |
+| **diagnostics** | `get_errors`, IDE problems panel, or the project's own lint/build command |
+
+If a capability is missing, fall back: no semantic search → content search with
+regex alternation; no diagnostics tool → run the project's build or lint command.
+
 ## Golden Rules
 
-1. **First: check for errors** — `get_errors()` before anything else. Fixing compile errors is priority zero.
-2. **NEVER read files one by one** — `grep_search` with regex alternation first
-3. **`semantic_search` for concepts**, `grep_search` for exact symbols
-4. **`file_search` for globs** to discover structure instantly
-5. **Read 100+ lines at a time** — fewer reads = fewer tokens
-6. **Parallel reads** — read 2-3 key files in one turn
-7. **Avoid the "grep tax"** — use familiar formats (Markdown/YAML), not obscure ones
+1. **Check for errors first.** Run diagnostics, or the project's lint/build command.
+   Fixing what is already broken is priority zero.
+2. **Never read files one by one.** Content search with regex alternation first.
+3. **Semantic search for concepts, content search for exact symbols.**
+4. **Glob search to learn the layout** before reading anything.
+5. **Read 100+ lines at a time.** Fewer reads means fewer tokens.
+6. **Read in parallel.** Two or three key files in a single turn.
+7. **Prefer familiar formats.** Markdown and YAML cost fewer tokens to interpret
+   than bespoke or binary formats.
 
-## Progressive Disclosure (Skill Pattern)
+## Progressive Disclosure
 
-Top coding agents (Codex, Claude Code) use this — do the same:
-1. **Metadata** (~100 tokens): name + description loaded for ALL files
-2. **Instructions** (< 500 lines): body loaded when triggered
-3. **Resources** (on-demand): only files referenced via Markdown links
+The same pattern this toolkit uses for skills applies to reading a codebase:
+
+1. **Metadata** — names, paths, signatures. Cheap, load broadly.
+2. **Instructions** — the one or two files that actually define the behavior.
+3. **Resources** — everything else, on demand only.
 
 ## Strategy by Goal
 
 | Goal | Approach |
-|------|----------|
-| "Where is X?" | `grep_search` → `vscode_listCodeUsages` → read defining file |
-| "How does this work?" | `file_search("**/*.{ts,js}")` → `semantic_search("architecture")` → read ONE key file deeply |
-| "Find tests for Y" | `file_search("**/Y*.spec.ts")` — glob is instant |
-| "What deps?" | `read_file("package.json", 1, 100)` — one read |
-| "Are there errors?" | `get_errors()` FIRST — then grep for error symbols |
-| "Find all imports of X" | `grep_search("import.*X", isRegexp=true)` across `**/*.ts` |
-
-## Tool Quick Reference
-
-| Tool | Best for |
-|------|---------|
-| `get_errors(filePaths)` | **Always first** — compile/lint errors |
-| `grep_search(query, isRegexp, includePattern)` | Text/regex: `function|class|interface` |
-| `semantic_search(query)` | Natural language: "how does auth work" |
-| `file_search(query)` | Glob: `**/*.spec.ts`, `**/*.component.ts` |
-| `read_file(path, start, end)` | Read 100+ line chunks (parallel when possible) |
-| `vscode_listCodeUsages(symbol, lineContent)` | All references of a symbol |
-| `list_dir(path)` | Directory listing |
+|---|---|
+| "Where is X?" | content search for the symbol → find its references → read the defining file |
+| "How does this work?" | glob search for the source tree → semantic search for the concept → read ONE key file deeply |
+| "Find tests for Y" | glob the project's test convention (`**/*_test.go`, `**/test_*.py`, `**/*Test.java`, `**/*.spec.*`, `**/*Tests.cs`) |
+| "What are the dependencies?" | read the manifest once (`package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `pom.xml`, `*.csproj`, `Gemfile`) |
+| "Are there errors?" | diagnostics FIRST — then search for the error symbols it reports |
+| "Find all usages of X" | content search with regex, scoped by glob to the language's extensions |
+| "What is the entry point?" | glob for `main.*`, `Program.cs`, `index.*`, `app.*`, or read the manifest's start/scripts section |
 
 ## Anti-Patterns
 
 | Don't | Do |
-|-------|-----|
-| Read 15 files sequentially | Search first, read 2-3 key files in parallel |
-| Read 20-line chunks | 100-200 lines at a time |
-| Single-keyword searches | Regex alternation |
-| Guess file locations | `file_search` with globs |
-| Use obscure formats for context | Markdown/YAML — models know them best |
-| Skip error checking | `get_errors()` as step 1 |
+|---|---|
+| Read 15 files sequentially | Search first, then read 2-3 key files in parallel |
+| Read 20-line chunks | Read 100-200 lines at a time |
+| Single-keyword searches | Regex alternation: `class\|interface\|func` |
+| Guess where files live | Glob search |
+| Skip error checking | Diagnostics as step 1 |
+| Assume one language's layout | Detect the manifest, then use that ecosystem's conventions |
 
 ## Token Economics
 
 | Approach | Tokens |
-|----------|--------|
+|---|---|
 | Sequential 15 files × 500 tokens | ~7,500 |
 | With this playbook | ~700 |
 | **Savings** | **~91%** |

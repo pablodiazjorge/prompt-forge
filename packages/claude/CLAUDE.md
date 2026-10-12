@@ -1,40 +1,15 @@
-# CLAUDE.md
+@AGENTS.md
 
-## Startup Sequence — Mandatory
+## Claude Code
 
-At the start of every session, before doing anything else:
+Claude Code discovers skills and subagents natively, so skip steps 1-3 of the
+startup sequence above — you do not need to enumerate frontmatter by hand.
 
-1. Read the directories under `.claude/skills/` to discover all available skills.
+- Skills live in `.claude/skills/`. They load on demand when the task matches
+  their description.
+- The `ai-engineer` subagent is defined in `.claude/agents/ai-engineer.md`.
+  Launch it with the Task tool when the user asks to organize knowledge.
+- `developer` is the one skill to load every session, per the startup sequence.
 
-2. For each skill, read only the YAML frontmatter (lines between the first two
-   `---` delimiters) to get the `name` and `description`.
-
-3. Compare the current task against each description. If it matches, read the
-   full `SKILL.md` body and follow its instructions.
-
-4. The `developer` skill handles continuous issue tracking and applies to ALL
-   work. Load it immediately. All other skills use progressive disclosure
-   (steps 2-3): read only their frontmatter descriptions and load the full
-   body only when the task matches the description.
-
-5. Run any available lint/compile checks before making changes.
-
-## During the Session
-
-- Run the `developer` skill at the end of every significant iteration. It
-  records issues in `knowledge/issues/open/` but never promotes or modifies
-  skills.
-- Run the `ai-engineer` skill as a subagent when the user asks to organize
-  knowledge, clean up issues, or promote patterns to skills/memories.
-- Note errors, API changes, and workarounds mentally. The `developer` skill
-  formalizes them into `knowledge/issues/` after the session.
-
-## Git
-
-Use Conventional Commits v1.0.0. One logical change per commit.
-Branch naming: `feature/<name>`, `fix/<name>`, `docs/<name>`, `chore/<name>`.
-
-## After Each Session
-
-1. Run the `developer` skill to capture learnings.
-2. Commit changes to `knowledge/issues/` and any updated skills.
+For step 5 (check for existing errors), run this project's lint or build command;
+there is no separate diagnostics tool.

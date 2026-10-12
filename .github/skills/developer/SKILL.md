@@ -12,7 +12,7 @@ license: MIT
 metadata:
   author: pablodiazjorge
   url: https://github.com/pablodiazjorge/prompt-forge
-  version: "1.0"
+  version: "1.1"
   tokens: "1.2k"
 ---
 
@@ -34,13 +34,13 @@ Review the current conversation for these signal types:
 
 | Signal | Examples | Priority |
 |--------|----------|----------|
-| **Error fixed** | "PowerShell interpretó `{{ }}` mal", "ngx-translate v18 no tiene `forRoot()`" | HIGH |
-| **API discovery** | "`linkedSignal` requires Node ≥22", "`provideZonelessChangeDetection()` is stable in Angular 22" | HIGH |
-| **Workaround found** | "Usa `create_file` en vez de `Set-Content` para templates" | MEDIUM |
+| **Error fixed** | "PowerShell mangled `{{ }}` in a here-string", "`<lib>` v18 removed `<api>`" | HIGH |
+| **API discovery** | "`<feature>` requires runtime ≥ X", "`<api>` is stable as of `<framework>` vN" | HIGH |
+| **Workaround found** | "Write templates with the agent's file tool, not shell redirection" | MEDIUM |
 | **Pattern repeated** | Same error occurred 2+ times in this session alone | HIGH |
-| **Project quirk** | "Este monorepo usa npm workspaces", "El `.gitignore` excluye `.github/`" | MEDIUM |
-| **Tool limitation** | "Copilot no expone `usage.prompt_tokens` directamente" | LOW |
-| **User preference** | "Prefiere comandos separados con `;` no `&&`" | MEDIUM |
+| **Project quirk** | "This monorepo uses workspaces", "`.gitignore` excludes the agent config dir" | MEDIUM |
+| **Tool limitation** | "This agent does not expose per-request token usage" | LOW |
+| **User preference** | "Prefers separate commands over chaining" | MEDIUM |
 
 ### Phase 2 — Cross-Reference with Issue Registry
 
@@ -48,7 +48,7 @@ Review the current conversation for these signal types:
 2. **For each signal from Phase 1**, attempt to match against existing issues:
    - Match by keyword overlap (title + description)
    - Match by category + similar error pattern
-   - Use `grep_search` on `knowledge/issues/open/` for related content
+   - Run a content search over `knowledge/issues/open/` for related wording
 
 ### Phase 3 — Create or Update Issues
 
@@ -75,7 +75,7 @@ Re-evaluate certainty:
   - 1 occurrence → low
   - 2 occurrences → medium
   - 3+ occurrences → high
-Update the issue file in open/ using replace_string_in_file
+Update the issue file in open/ with the agent's targeted-edit tool
 Update INDEX.md counts and row data
 ```
 
@@ -104,7 +104,7 @@ Output a summary table:
    updates to `INDEX.md`.
 
 2. **NEVER modify skills or memory files.** You are a read-only observer
-   of `.github/skills/` and `/memories/`. Do not touch them.
+   of the project's skills directory and its memory files. Do not touch them.
 
 3. **NEVER create a skill for something the model already knows** — if it's
    common knowledge (e.g., "use `const` not `var`"), skip it entirely.
@@ -112,9 +112,9 @@ Output a summary table:
 4. **Keep issue files concise** — the TEMPLATE.md format is the maximum, not
    the minimum. Don't write essays.
 
-5. **Session isolation** — the `sessions` array in frontmatter stores session
-   UUIDs. Use `session_store_sql` to find the current session UUID if available,
-   otherwise use a date-based identifier.
+5. **Session isolation** — the `sessions` array in frontmatter distinguishes
+   occurrences across sessions. Use the agent's session identifier if it exposes
+   one, otherwise a date-based identifier.
 
 6. **Always populate `created_by`** — set it to the agent name or session
    identifier so the `ai-engineer` can trace issue origins during review.

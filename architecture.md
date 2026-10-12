@@ -25,13 +25,14 @@ own behavior.
 
 ```
 Host Project
-+------------------------------------------+
-|  .github/skills/          (6 SKILL.md files)    |
-|  .github/agents/          (custom agents)       |
-|  .github/instructions/    (agent instructions)  |
-|  knowledge/issues/        (registry + issues)   |
-|  .github/copilot-instructions.md                |
-+------------------------------------------+
++--------------------------------------------------+
+|  AGENTS.md              (agent instructions)     |
+|  CLAUDE.md              (thin, imports AGENTS.md)|
+|  <skills-dir>/          (6 SKILL.md files)       |
+|  <agents-dir>/          (ai-engineer subagent)   |
+|  knowledge/issues/      (registry + issues)      |
+|  knowledge/memory/      (promoted facts)         |
++--------------------------------------------------+
          |
          | read & execute on demand
          v
@@ -42,9 +43,13 @@ Host Project
 +-------------------+
 ```
 
+`<skills-dir>` is `.github/skills/` for VS Code-hosted agents and
+`.claude/skills/` for Claude Code; `<agents-dir>` follows the same split.
+
 There is no runtime, no server process, no database, and no build step. The
-toolkit is purely declarative: Markdown files encode instructions, PowerShell
-scripts perform side effects like logging, and the agent is the interpreter.
+toolkit is purely declarative: Markdown files encode instructions and the agent
+is the interpreter. The single PowerShell script in the repository is a
+maintainer tool and is not shipped to host projects.
 
 ---
 
@@ -55,9 +60,10 @@ evaluated against them.
 
 **Principle 1: Zero runtime dependencies.**
 The toolkit must work in any project without requiring npm installs, Python
-virtual environments, or any other package manager invocation. The only
-assumption is that the host machine has PowerShell 5.1 or later, which is
-preinstalled on all supported Windows versions.
+virtual environments, or any other package manager invocation. What ships to a
+host project is Markdown and nothing else -- no scripts, no interpreter, no
+platform assumption. `sync-skills.ps1` lives outside every package and is run
+only by prompt-forge maintainers on Windows.
 
 **Principle 2: Host-project safety.**
 prompt-forge files must never interfere with the host project's own build
@@ -79,10 +85,15 @@ Markdown file in a directory. This means knowledge is version-controlled,
 diffable, mergeable, and survives independently of any external service.
 
 **Principle 5: Agent-agnostic design.**
-No skill or script assumes a specific AI coding agent. While
-`copilot-instructions.md` is loaded automatically by GitHub Copilot, the skills
-themselves reference only agent tools that are common across platforms (read
-file, search code, run terminal commands).
+No skill assumes a specific AI coding agent. Skills name **capabilities**, not
+vendor tool names: "the agent's targeted-edit tool", not `replace_string_in_file`;
+"content search", not `grep_search`. Concrete names appear only as parenthetical
+examples, never as the sole instruction, because the same skill file is shipped
+verbatim to every provider package. Instructions live in `AGENTS.md`, the
+cross-tool standard, with a thin `CLAUDE.md` importing it for Claude Code.
+
+Skills also avoid hardcoding the skills directory, since it differs per provider.
+Only `AGENTS.md` and `CLAUDE.md` name concrete paths.
 
 ---
 
@@ -211,9 +222,10 @@ functionality (skills, issue registry, developer) is platform-independent
 Markdown; the scripts are an optional Windows bonus.
 
 **Consequences.**
-Cross-platform users on macOS/Linux cannot use the session tracking scripts
-without installing PowerShell Core. The scripts remain the recommended approach
-for Windows users who want cumulative cost tracking across sessions.
+The scripts are gone and nothing replaced them. Host projects now receive
+Markdown only, which strengthens Principle 1: there is no longer any host-side
+platform assumption at all. `sync-skills.ps1` remains, but as a maintainer tool
+outside every package.
 
 ---
 
@@ -261,10 +273,11 @@ The skill author must write descriptions that accurately reflect the trigger
 conditions. A poorly written description either causes the skill to be loaded
 when irrelevant (wasting tokens) or not loaded when needed (missing the
 opportunity to help). This is mitigated by keeping descriptions concise and
-specific. The `tokens` field in frontmatter helps the agent decide whether the
-skill is worth loading: a 0.5k skill like git-workflow can be loaded eagerly
-with minimal cost, while a 1.8k skill like ai-engineer should be loaded only
-when the user explicitly requests knowledge organization.
+specific. The `tokens` field in frontmatter signals how much a skill costs
+once triggered: a 0.5k skill like git-workflow is cheap enough that a
+false-positive trigger barely matters, while a 1.8k skill like ai-engineer is
+gated behind `disable-model-invocation: true` and loads only on explicit
+request. Only `developer` is loaded eagerly, every session.
 
 ---
 
@@ -388,9 +401,14 @@ across sessions and agents.
 
 **Decision.**
 Use a category routing table in `INDEX.md` that maps each issue category to a
-promotion target. Categories include `library-api`, `powershell`, `angular`,
+promotion target. Categories include `library-api`, `powershell`, `framework`,
 `git`, `skill-creation`, `project-specific`, and `unknown`. The routing table is co-located with
 the issue index so it can evolve alongside the issue corpus.
+
+Note that `framework` is deliberately generic. An earlier revision hardcoded
+`angular`, which contradicted Principle 5 and routed to a skill that never
+existed. Category names must describe a *kind* of knowledge, not one project's
+stack.
 
 **Rationale.**
 Explicit routing rules make promotion behavior predictable and auditable. A
@@ -407,9 +425,15 @@ knowledge types belong, rather than allowing ad-hoc scattering.
 
 ---
 
-### ADR-008: Minimal .gitignore Footprint
+### ADR-008: Minimal .gitignore Footprint ~~(Retired)~~
 
-**Context.**
+> **Status: Retired (2026-08-09).** The shipped `.gitignore` existed to cover
+> `.prompt-forge/` session logs, which no longer exist after ADR-003 was retired.
+> No package ships a `.gitignore` today, and prompt-forge writes no runtime
+> artifacts at all. The remaining root `.gitignore` covers only this repository's
+> own editor and OS cruft. The ADR is preserved for historical reference.
+
+**Context (original).**
 prompt-forge ships with a `.gitignore` file that is copied into the host
 project. An overly broad `.gitignore` would interfere with the host project's
 own ignore rules. An empty `.gitignore` would cause prompt-forge's session logs
@@ -465,13 +489,14 @@ discovery cost and maintenance burden. Most skills would rarely trigger.
 
 C. A small set of skills covering the most common failure modes of AI coding
 agents: codebase exploration (reading too many files), Git operations
-(incorrect commit formats, bad branching), PowerShell on Windows (chaining
-with &&, template escaping), session management (not learning from past
-sessions), and cost awareness (not tracking token spend).
+(incorrect commit formats, bad branching), the Windows shell (chaining
+operators, template escaping, exit codes), and session management (not learning
+from past sessions).
 
 **Decision (original).**
-Ship five skills: auto-improve, explore-codebase, git-workflow,
-powershell-patterns, and skill-creator.
+Ship five skills: `auto-improve`, `explore-codebase`, `git-workflow`,
+`powershell-patterns`, and `skill-creator`. A sixth, `track-tokens`, was added
+and later removed -- see ADR-003.
 
 **Evolution (2026-06-27).**
 The original monolithic `auto-improve` skill was split into two specialized
@@ -554,6 +579,10 @@ below.
 
 ### ADR-011: Provider-Specific Distribution Packages
 
+> **Amended by ADR-012 (2026-08-09).** The three packages became two once
+> instructions moved to `AGENTS.md`. The reasoning below still holds for the
+> skills and agents directories, which remain provider-specific.
+
 **Context.**
 Different AI coding agents discover skills and instructions from different
 paths. GitHub Copilot loads skills from `.github/skills/` and instructions from
@@ -611,12 +640,71 @@ directories in each package.
 
 ---
 
+### ADR-012: AGENTS.md as the Single Instruction Surface
+
+**Context.**
+By August 2026 the instruction layer had fragmented into four near-duplicate
+copies of the same startup sequence: `.github/copilot-instructions.md`,
+`.github/instructions/default.instructions.md`, `packages/claude/CLAUDE.md`, and
+a compressed translation embedded in a JSON string inside the DeepSeek setup
+guide. They had already drifted apart. Every future edit meant four edits, and
+`sync-skills.ps1` covered only two of them.
+
+Meanwhile the ecosystem converged. `AGENTS.md` is an open format stewarded by the
+Agentic AI Foundation under the Linux Foundation, adopted by 20+ tools and 60k+
+repositories. VS Code reads it natively from the workspace root
+(`chat.useAgentsMdFile`), as do Codex, Cursor, Windsurf, Zed, Aider and Jules.
+
+**Options considered.**
+
+A. Keep the per-provider files and add token substitution to `sync-skills.ps1`
+so one template generates all four. Turns a copy script into a template engine
+and still leaves four artifacts to debug.
+
+B. Pick one provider's format as canonical and document the conversion. Pushes
+the work onto every user and breaks the drop-in principle.
+
+C. Adopt `AGENTS.md` as the single source. Claude Code does not read it, but
+Anthropic documents the import pattern: a `CLAUDE.md` whose first line is
+`@AGENTS.md`, with Claude-specific rules below. On Windows the import is the only
+option, since symlinks require Administrator or Developer Mode.
+
+**Decision.**
+Adopt option C. `AGENTS.md` at the repository root is the single source of truth
+for agent instructions. `CLAUDE.md` is a thin file that imports it and adds the
+Claude-specific notes about native skill and subagent discovery. Delete
+`copilot-instructions.md` and `default.instructions.md`.
+
+**Rationale.**
+Four copies of a startup sequence is a defect, not a feature. prompt-forge never
+used `applyTo` with anything other than `"**"`, so the glob-scoping capability of
+`.instructions.md` was never exercised and nothing is lost by dropping it. The
+`@AGENTS.md` import is Anthropic's own documented recommendation, so the pattern
+is supported rather than a workaround.
+
+The decision also collapses the package count. Once `copilot-instructions.md` is
+gone, `packages/copilot` and `packages/custom` differ by nothing, so they merge
+into `packages/vscode`. The DeepSeek guide moves to `docs/`, since it documents a
+third-party bug rather than shipping anything.
+
+**Consequences.**
+Users must have `chat.useAgentsMdFile` enabled in VS Code; the README says so.
+The `ai-engineer` subagent now exists in both packages, in each provider's native
+format, so the two agent definitions are separate sources rather than copies --
+`sync-skills.ps1` mirrors `.github/agents/` to the VS Code package and
+`.claude/agents/` to the Claude package. If a third provider standardizes on a
+different subagent format, it gets a third source directory rather than a
+conversion step.
+
+---
+
 ## Component Architecture
 
 ### Skill System
 
-Each skill is a self-contained directory under `.github/skills/<name>/`
-containing exactly one `SKILL.md` file. The directory structure allows future
+Each skill is a self-contained directory under the provider's skills directory
+(`.github/skills/<name>/` or `.claude/skills/<name>/`), containing exactly one
+`SKILL.md` file. The directory structure allows future
 extension: a skill could add supplementary files (examples, templates,
 references) without changing the core format.
 
@@ -769,7 +857,7 @@ one.
 
 Skill files are modified less frequently than `INDEX.md`, but the same merge
 logic applies. When ai-engineer promotes an issue to a skill, it uses
-`replace_string_in_file` to add a new section. If two developers promote to the
+a targeted edit to add a new section. If two developers promote to the
 same skill simultaneously, the second promotion will see a stale file and need
 to re-read before editing. The ai-engineer skill instructs the agent to always
 read the current file state before editing, which mitigates but does not
@@ -779,10 +867,16 @@ eliminate this race condition.
 
 ## Security Considerations
 
-prompt-forge does not handle secrets, credentials, or user data. The session
-The `.gitkeep` files in `knowledge/issues/` subdirectories are inert
-placeholders that ensure Git preserves empty directories. No sensitive data
-is stored in the repository.
+prompt-forge does not handle secrets, credentials, or user data. It writes no
+runtime artifacts and makes no network requests. The `.gitkeep` files in
+`knowledge/issues/` subdirectories are inert placeholders that ensure Git
+preserves empty directories. No sensitive data is stored in the repository.
+
+One caveat belongs to the learning loop rather than the toolkit: issue files
+record verbatim excerpts from coding sessions. If a session surfaced a
+credential or an internal hostname, the `developer` skill could copy it into
+`knowledge/issues/open/`, which is committed and shared. Review issue files in
+code review the same way you would review any other committed change.
 
 The skills instruct the AI agent to read, write, and edit files within the
 project. This is the agent's normal mode of operation; the skills do not grant
@@ -851,6 +945,9 @@ create the skill first.
 - Architectural Decision Records: https://adr.github.io/
 - MADR (Markdown Architectural Decision Records): https://adr.github.io/madr/
 - agentskills.io standard: https://agentskills.io
+- AGENTS.md standard (Agentic AI Foundation): https://agents.md/
+- VS Code custom instructions: https://code.visualstudio.com/docs/copilot/customization/custom-instructions
+- Claude Code memory and imports: https://code.claude.com/docs/en/memory
 - Conventional Commits v1.0.0: https://www.conventionalcommits.org/
 - Prompt caching (Anthropic): https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
 - Context window documentation (OpenAI): https://platform.openai.com/docs/models

@@ -10,7 +10,7 @@ license: MIT
 metadata:
   author: pablodiazjorge
   url: https://github.com/pablodiazjorge/prompt-forge
-  version: "1.0"
+  version: "1.1"
   tokens: "2.3k"
 ---
 
@@ -35,11 +35,13 @@ Codex, Cursor, Gemini CLI, and many others.
 
 ### Directory Structure
 
-Each skill is a directory under `.github/skills/` containing a `SKILL.md` file.
-The directory name must match the `name` field in the frontmatter.
+Each skill is a directory under the project's skills directory, containing a
+`SKILL.md` file. That directory is `.github/skills/` for VS Code and Copilot and
+`.claude/skills/` for Claude Code — `AGENTS.md` and `CLAUDE.md` name the one in
+use. The directory name must match the `name` field in the frontmatter.
 
 ```
-.github/skills/<skill-name>/
+<skills-dir>/<skill-name>/
 ├── SKILL.md          # Required: YAML frontmatter + Markdown body
 ├── scripts/          # Optional: executable code the agent can run
 ├── references/       # Optional: additional docs loaded on demand
@@ -173,8 +175,8 @@ Write-Host "$k k"
 
 ### Step 5: Create the Files
 
-Use the agent `create_file` tool to write `SKILL.md` to the new directory
-under `.github/skills/<name>/`. The directory must not already exist.
+Use the agent's file-creation tool to write `SKILL.md` to the new directory
+under the project's skills directory. The directory must not already exist.
 
 After creating the skill, verify:
 - The directory name matches the `name` field exactly
@@ -185,8 +187,8 @@ After creating the skill, verify:
 
 ## Updating an Existing Skill
 
-When updating a skill, use `replace_string_in_file` to make targeted edits.
-Always include 3-5 lines of surrounding context in the match string. After
+When updating a skill, use the agent's targeted-edit tool rather than rewriting
+the file. Always include 3-5 lines of surrounding context in the match string. After
 editing, re-measure the token count and update `metadata.tokens` if it changed
 by more than 0.1k.
 

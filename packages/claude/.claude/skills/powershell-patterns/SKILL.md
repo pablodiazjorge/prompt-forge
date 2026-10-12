@@ -1,78 +1,132 @@
 ---
 name: powershell-patterns
 description: |
-  PowerShell 5.1 patterns, pitfalls, and best practices for Windows development.
-  Use when running terminal commands, writing PowerShell scripts, working with
-  Node.js/npm on Windows, or encountering PowerShell errors. Covers nvm-windows,
-  Angular template escaping, execution policy, and cmdlet selection.
+  PowerShell patterns, pitfalls, and cmdlet choices for Windows development,
+  covering both Windows PowerShell 5.1 and PowerShell 7.x. Use when running
+  terminal commands on Windows, writing or debugging .ps1 scripts, chaining
+  commands, checking the exit code of a build or test executable, escaping
+  template syntax in generated files, or activating a toolchain version manager.
 license: MIT
 metadata:
   author: pablodiazjorge
   url: https://github.com/pablodiazjorge/prompt-forge
-  version: "1.2"
-  tokens: "0.6k"
-  sources: "learn.microsoft.com/powershell, github.com/coreybutler/nvm-windows"
+  version: "2.0"
+  tokens: "1.2k"
+  sources: "learn.microsoft.com/powershell: about_Parsing, about_Quoting_Rules, about_Execution_Policies, about_Automatic_Variables"
 ---
 
-# PowerShell Patterns for Development
+# PowerShell Patterns
 
-## Critical Pitfalls
+`powershell.exe` is **Windows PowerShell 5.1** (preinstalled, what an agent
+terminal usually gets). `pwsh` is **PowerShell 7.x**, a separate install. Check
+`$PSVersionTable.PSVersion` before using modern syntax: Major 5 means every rule
+below applies, Major 7 lifts most of them.
 
-### Templates with `{{ }}` — NEVER use Set-Content or heredocs
+## 5.1 vs 7.x
 
-PowerShell interprets `{{ }}` as variable interpolation. Use the agent's `create_file`
-tool for any file containing `{{ }}`, `${{}}`, or Angular syntax.
+| Feature | Windows PowerShell 5.1 | PowerShell 7.x |
+|---|---|---|
+| `&&` / `\|\|` chain operators | Parser error | Supported |
+| Ternary `? :`, `??`, `??=`, `?.` | Not available (use `if/else`, `$null -eq`) | Supported |
+| `ConvertFrom-Json -AsHashtable` | Not available (returns PSCustomObject) | Supported |
+| `Set-Content`/`Out-File` encoding | ANSI codepage — pass `-Encoding utf8` | UTF-8, no BOM |
+
+Sequencing on both editions:
 
 ```powershell
-# ❌ NEVER:
-Set-Content file.html @"<div>{{ title }}</div>"@
-
-# ✅ Always: agent create_file tool
-# Editing existing files: replace_string_in_file
-# Commands WITHOUT {{ }}: Set-Content with single quotes works fine
+cmd1; cmd2                # unconditional
+cmd1; if ($?) { cmd2 }    # only if cmd1 succeeded
 ```
 
-### nvm-windows
+## Exit Codes and Errors
 
-- `nvm install X.Y.Z` does **NOT auto-activate** → `nvm use X.Y.Z` is mandatory
-- `nvm list` shows installed versions, `*` = active
-- Global packages (`@angular/cli`) are **NOT migrated** between versions
-- **Requires Admin shell** — run PowerShell as Administrator
-- `@angular/cli@22` → Node `^22.22.3 || ^24.15.0 || >=26.0.0`
+- `$LASTEXITCODE` is the exit code of the last **native executable** — the thing to
+  test after a build, test run, or linter: `dotnet build; if ($LASTEXITCODE) { throw }`.
+- `$?` is per-command success, but unreliable around native exes: `2>&1` in 5.1
+  wraps each stderr line in a `NativeCommandError` record and can make `$?` false
+  even when the exe exited 0. Prefer `2>$null`, or leave stderr alone.
+- `-ErrorAction SilentlyContinue` suppresses error *output*; the command still failed.
+- `try/catch` catches only terminating errors; add `-ErrorAction Stop` to make a
+  cmdlet failure catchable.
 
-### Chaining — NEVER `&&`
+## Quoting, Escaping, Environment
 
-`&&` is not valid in PowerShell 5.1:
+- Escape char is a backtick; `\` is literal, so Windows paths need no escaping.
+- Quote paths with spaces and launch executables with the call operator:
+  `& "C:\Program Files\App\app.exe" --flag`.
+- `--%` stops PowerShell parsing the rest of the line: `git log --% --format=%H`.
+- No inline `VAR=x cmd` prefix. Use `$env:VAR = 'x'; cmd`.
+
+### Files containing `{{ }}`, `${{ }}`, or `$`
+
+Template syntax (Jinja2, Handlebars, Mustache, Liquid, Django, Go templates, Vue,
+Helm, GitHub Actions) collides with PowerShell interpolation.
+
 ```powershell
-npm install; npm run build   # OK
-npm install                  # Better: separate commands
-npm run build
+# BAD — $ and {{ }} are expanded or mangled
+Set-Content f.yml @"
+value: {{ name }}
+"@
+
+# OK — literal here-string; the closing '@ MUST be at column 0
+Set-Content f.yml -Encoding utf8 @'
+value: {{ name }}
+'@
 ```
 
-### Execution Policy
+Better: use the agent's native file-creation/edit tool (`Write`, `create_file`, or
+the harness equivalent) instead of shell redirection — it writes bytes verbatim.
 
-Windows 11/10 default to `Restricted` — `.ps1` scripts won't execute.
+`New-Item -Force` on an existing file **truncates it**. There is no `touch`; use
+`if (-not (Test-Path p)) { New-Item -ItemType File p }`.
+
+## Never Block a Non-Interactive Shell
+
+An agent shell has no usable stdin: these hang until timeout instead of prompting.
+
+- `Read-Host`, `Get-Credential`, `Out-GridView`, `pause`, `$Host.UI.PromptForChoice`
+- Destructive cmdlets that confirm (`Remove-Item`, `Stop-Process`): pass
+  `-Confirm:$false` when the action is intended, `-Force` for read-only/hidden items
+- Anything that opens an editor (`git rebase -i`, `git commit` without `-m`)
+- Never `Start-Sleep` to wait for work; the agent is notified when a command ends.
+  Launch a long-lived server with `Start-Process` so the shell returns.
+
+## Toolchain Version Managers
+
+nvm-windows, pyenv-win, rustup, jabba, sdkman, `global.json` SDK pinning — all work
+by rewriting PATH through a shim. Transferable rules:
+
+1. **Install is not activate.** Run the manager's `use`/`global` step, or pin the
+   version in the file the toolchain reads (`.nvmrc`, `.python-version`,
+   `rust-toolchain.toml`, `global.json`).
+2. **The current shell can be stale.** PATH edits apply to new processes; re-launch
+   the shell — elevated, if the manager writes symlinks or machine PATH.
+3. **Globally installed CLIs are per-version** and are not migrated on switch.
+4. Verify against the resolved binary, not the manager: `(Get-Command tool).Source`.
+
+## Unix Command Equivalents
+
+| Unix | PowerShell |
+|---|---|
+| `head -n N` / `tail -n N` | `Get-Content f -TotalCount N` / `-Tail N`; piped: `Select-Object -First N` / `-Last N` |
+| `which x` | `(Get-Command x).Source` |
+| `wc -l` | `(Get-Content f \| Measure-Object -Line).Lines` |
+| `mkdir -p` | `New-Item -ItemType Directory -Force p` |
+| `rm -rf` | `Remove-Item -Recurse -Force p` |
+
+Aliases (`ls`, `cat`, `curl`) exist but can be shadowed — use real cmdlet names.
+
+## Execution Policy
+
+Windows defaults to `Restricted`; `.ps1` files will not run.
+
 ```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned              # Requires admin
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser  # Without admin
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser     # no admin needed
+powershell -ExecutionPolicy Bypass -File .\s.ps1        # one-shot, nothing persisted
 ```
 
-## Best Practices
+## Habits
 
-1. **Native cmdlets** not aliases: `Get-ChildItem` not `ls`, `Select-String` not `findstr`
-2. **Quote paths**: `"C:\Path With Spaces\file.txt"`
-3. **`Select-Object -First N`** to limit output
-4. **`2>$null`** to suppress stderr
-5. **`Test-Path`** before reading/writing
-6. **NEVER `Start-Sleep`** — the agent is notified when async commands finish
-7. **`Remove-Item -Force`** to delete; **`Push-Location`/`Pop-Location`** to navigate
-
-## File Operations Decision Table
-
-| Task | Tool |
-|------|------|
-| Create file with `{{ }}` | Agent `create_file` |
-| Edit existing file | `replace_string_in_file` |
-| Multiple simultaneous edits | `multi_replace_string_in_file` |
-| Simple script without templates | `Set-Content` with single quotes |
-| Overwrite existing file | `Remove-Item -Force` → `create_file` |
+1. `Test-Path` before reading, writing, or changing directory.
+2. `Push-Location` / `Pop-Location` instead of bare `Set-Location`.
+3. `Select-Object -First N` on any command that can produce long output.

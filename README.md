@@ -1,8 +1,8 @@
 # prompt-forge
 
-A drop-in toolkit that adds Agent Skills, a learning loop, and session
-tracking to any software project. Copy the files in and your AI coding agent
-gets smarter with every session. No dependencies, no build step, no backend.
+A drop-in toolkit that adds Agent Skills and a learning loop to any software
+project. Copy the files in and your AI coding agent gets smarter with every
+session. No dependencies, no build step, no backend.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -12,8 +12,8 @@ gets smarter with every session. No dependencies, no build step, no backend.
 
 AI coding agents are powerful but stateless. They enter each session with the
 same baseline knowledge and make the same mistakes across sessions and across
-developers. A team of five engineers using Copilot might independently discover
-the same PowerShell pitfall, the same broken ngx-translate API, and the same
+developers. A team of five engineers might independently discover the same
+PowerShell pitfall, the same breaking change in a dependency, and the same
 inefficient codebase exploration pattern -- each paying the token cost to debug
 it from scratch.
 
@@ -30,7 +30,7 @@ The architecture is designed around five principles:
 | Host-project safety | Never interferes with build systems, linters, or existing `.gitignore` rules |
 | Progressive disclosure | Skills cost ~100 tokens at discovery time; full instructions load only when triggered |
 | Git-native persistence | The issue registry is a directory of Markdown files -- diffable, mergeable, version-controlled |
-| Agent-agnostic | No skill assumes a specific AI coding platform; works with Copilot, Claude Code, and Codex |
+| Agent-agnostic | Skills name capabilities, not vendor tool names, and instructions live in `AGENTS.md` |
 
 For a detailed rationale behind every architectural decision, see
 [architecture.md](architecture.md).
@@ -40,8 +40,8 @@ For a detailed rationale behind every architectural decision, see
 ## What You Get
 
 Six Agent Skills following the [agentskills.io](https://agentskills.io)
-standard, plus a cross-session issue registry, agent instructions, and a custom
-agent.
+standard, a cross-session issue registry, an `AGENTS.md` instruction file, and a
+knowledge-curation subagent.
 
 ### Skills
 
@@ -49,14 +49,14 @@ agent.
 |-------|---------------|-------------|
 | `developer` | End of iteration; "analyze this session" | 1.2k |
 | `ai-engineer` | On-demand; "organize knowledge", "promote patterns" | 1.8k |
-| `explore-codebase` | "Where is X?"; "How does Y work?" | 0.7k |
+| `explore-codebase` | "Where is X?"; "How does Y work?" | 0.8k |
 | `git-workflow` | Committing, branching, reviewing PRs | 0.5k |
-| `powershell-patterns` | Terminal commands, .ps1 scripts, npm on Windows | 0.6k |
+| `powershell-patterns` | Terminal commands and `.ps1` scripts on Windows | 1.2k |
 | `skill-creator` | Creating or fixing Agent Skills; ai-engineer promotion target | 2.3k |
 
-Total discovery overhead across all six skills is approximately 600 tokens per
-session. Skill bodies are loaded only when the conversation context matches the
-skill's description. Only the `developer` skill is loaded eagerly at startup.
+Discovery overhead across all six is roughly 600 tokens per session. Bodies load
+only when the conversation matches the skill's description. Only `developer` is
+loaded eagerly at startup.
 
 ### Issue Registry
 
@@ -73,26 +73,47 @@ Issue IDs use a collision-free format (`ISSUE-YYYYMMDD-XXXX`) designed for
 multi-developer teams. Two developers can create issues simultaneously without
 coordination.
 
+Confirmed knowledge that is factual rather than procedural lands in
+`knowledge/memory/` instead of a skill. The routing table in
+[knowledge/issues/INDEX.md](knowledge/issues/INDEX.md) decides which.
+
+---
+
+## Instructions: one file, every agent
+
+prompt-forge keeps its agent instructions in a single root **`AGENTS.md`**, the
+open standard stewarded by the Agentic AI Foundation. It is read natively by VS
+Code, GitHub Copilot, Codex, Cursor, Windsurf, Zed, Aider and others.
+
+Claude Code reads `CLAUDE.md` rather than `AGENTS.md`, so the Claude package
+ships a thin `CLAUDE.md` whose first line is `@AGENTS.md`. Both agents end up
+with the same instructions and there is only one file to maintain.
+
 ---
 
 ## Installation
 
-prompt-forge is organized into provider-specific packages under `packages/`.
-Pick the folder that matches your AI coding agent, copy its contents into your
-project root, and you are done.
+Pick the package that matches your agent, copy its contents into your project
+root, and you are done.
 
-### Package: Copilot (GitHub Copilot, VS Code)
+### Package: VS Code (Copilot, Codex, Cursor, DeepSeek, OpenRouter)
 
 ```powershell
 git clone https://github.com/pablodiazjorge/prompt-forge.git temp-pf
-Copy-Item -Path temp-pf\packages\copilot\* -Destination .\ -Recurse
+Copy-Item -Path temp-pf\packages\vscode\* -Destination .\ -Recurse
 Remove-Item -Recurse -Force temp-pf
 ```
 
-Copies `.github/skills/`, `.github/copilot-instructions.md`,
-`.github/instructions/`, and `knowledge/` into your project.
+Copies `AGENTS.md`, `.github/skills/`, `.github/agents/`, and `knowledge/`.
 
-### Package: Claude (Claude Code, Anthropic)
+Confirm `chat.useAgentsMdFile` is enabled in VS Code settings -- without it,
+`AGENTS.md` is never loaded.
+
+**DeepSeek V4 users:** read [docs/DEEPSEEK-SETUP.md](docs/DEEPSEEK-SETUP.md).
+That extension has a known bug that downgrades system messages, and needs one
+extra setting.
+
+### Package: Claude Code
 
 ```powershell
 git clone https://github.com/pablodiazjorge/prompt-forge.git temp-pf
@@ -100,30 +121,12 @@ Copy-Item -Path temp-pf\packages\claude\* -Destination .\ -Recurse
 Remove-Item -Recurse -Force temp-pf
 ```
 
-Copies `.claude/skills/`, `CLAUDE.md`, and `knowledge/` into your
-project. Claude discovers skills from `.claude/skills/` and reads `CLAUDE.md`
-as its instruction file.
+Copies `AGENTS.md`, `CLAUDE.md`, `.claude/skills/`, `.claude/agents/`, and
+`knowledge/`. Claude Code discovers the skills and the `ai-engineer` subagent
+natively.
 
-### Package: Custom (DeepSeek V4, OpenRouter, third-party models)
-
-```powershell
-git clone https://github.com/pablodiazjorge/prompt-forge.git temp-pf
-Copy-Item -Path temp-pf\packages\custom\* -Destination .\ -Recurse
-Remove-Item -Recurse -Force temp-pf
-```
-
-Copies `.github/skills/`, `.github/instructions/`, and `knowledge/`
-into your project. Does not include `copilot-instructions.md` since
-third-party model providers may not load it. Uses `.instructions.md` format
-which is discovered by VS Code regardless of the model provider.
-
-**DeepSeek V4 users:** read [DEEPSEEK-SETUP.md](packages/custom/DEEPSEEK-SETUP.md)
-for additional configuration required due to a known bug in the extension.
-
-### After Copying
-
-Add `.prompt-forge/` to your `.gitignore` (the shipped `.gitignore` only
-covers prompt-forge artifacts and can be merged with yours).
+Verify with `/context` in a new session: `CLAUDE.md` should appear under
+**Memory files** with `AGENTS.md` expanded into it.
 
 ---
 
@@ -131,42 +134,37 @@ covers prompt-forge artifacts and can be merged with yours).
 
 ```
 prompt-forge/
+├── AGENTS.md                         Source of truth for agent instructions
+├── CLAUDE.md                         Maintainer instructions; imports AGENTS.md
 ├── .github/
-│   ├── copilot-instructions.md       Source of truth for Copilot instructions
-│   ├── instructions/
-│   │   └── default.instructions.md   Source of truth for VS Code instructions
-│   ├── agents/                       Custom agents (AI Engineer)
+│   ├── agents/                       VS Code custom agent (ai-engineer)
 │   └── skills/                       Source of truth for all 6 skills
+├── .claude/
+│   └── agents/                       Claude Code subagent (ai-engineer)
+├── knowledge/
+│   ├── issues/                       Issue registry: INDEX, template, 3 states
+│   └── memory/                       Promoted facts that aren't skills
+├── docs/
+│   ├── strategy.md                   Two-tier learning loop, industry comparison
+│   └── DEEPSEEK-SETUP.md             Workaround for a DeepSeek extension bug
 ├── packages/                         Distribution packages (pick one)
-│   ├── copilot/                      Drop-in for GitHub Copilot / VS Code
-│   │   ├── .github/
-│   │   │   ├── copilot-instructions.md
-│   │   │   ├── instructions/default.instructions.md
-│   │   │   ├── agents/   (AI Engineer agent)
-│   │   │   └── skills/   (6 SKILL.md)
-│   │   ├── knowledge/issues/
-│   ├── claude/                       Drop-in for Claude Code / Anthropic
-│   │   ├── .claude/
-│   │   │   └── skills/   (6 SKILL.md)
-│   │   ├── CLAUDE.md
-│   │   └── knowledge/issues/
-│   └── custom/                       Drop-in for DeepSeek, OpenRouter, etc.
-│       ├── .github/
-│       │   ├── instructions/default.instructions.md
-│       │   └── skills/   (6 SKILL.md)
-│       └── knowledge/issues/
-├── knowledge/issues/                 Issue registry template
-└── sync-skills.ps1                   Syncs .github/skills/ → all packages
+│   ├── vscode/                       AGENTS.md + .github/{skills,agents} + knowledge/
+│   └── claude/                       AGENTS.md + CLAUDE.md + .claude/{skills,agents} + knowledge/
+├── architecture.md                   Architectural decision record
+└── sync-skills.ps1                   Syncs the source of truth into both packages
 ```
+
+Everything under `packages/` is generated. Edit the source of truth, then run
+`.\sync-skills.ps1`.
 
 ---
 
 ## Documentation
 
-- [architecture.md](architecture.md) -- Full architectural decision record (11 ADRs, system context, data flow, token economics)
-- [knowledge/strategy.md](knowledge/strategy.md) -- Knowledge strategy: two-tier learning loop, industry comparison, promotion pipeline
-- [.github/instructions/default.instructions.md](.github/instructions/default.instructions.md) -- Agent instructions (loaded by VS Code on all model providers)
-- [knowledge/issues/INDEX.md](knowledge/issues/INDEX.md) -- Issue registry index and decision criteria
+- [architecture.md](architecture.md) -- Full architectural decision record (12 ADRs, system context, data flow, token economics)
+- [docs/strategy.md](docs/strategy.md) -- Knowledge strategy: two-tier learning loop, industry comparison, promotion pipeline
+- [AGENTS.md](AGENTS.md) -- The agent instructions themselves
+- [knowledge/issues/INDEX.md](knowledge/issues/INDEX.md) -- Issue registry index, decision criteria, and the category routing table
 - [knowledge/issues/TEMPLATE.md](knowledge/issues/TEMPLATE.md) -- Issue template
 
 ---

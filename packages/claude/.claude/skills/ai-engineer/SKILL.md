@@ -12,7 +12,7 @@ license: MIT
 metadata:
   author: pablodiazjorge
   url: https://github.com/pablodiazjorge/prompt-forge
-  version: "1.0"
+  version: "2.0"
   tokens: "1.8k"
 ---
 
@@ -32,20 +32,27 @@ when:
 This skill is designed to run as a **subagent** with a dedicated context window.
 It should review ALL issues, not just those from the current session.
 
-## Algorithm
+## Where You Sit in the Loop
 
-### Phase 0 — Discovery (NEW)
+The learning loop has six phases. The `developer` skill owns Phases 1-3
+(detection, cross-reference, recording) and never mutates anything outside
+`knowledge/issues/`. You own Phases 4-6 and you are the only role permitted to
+promote, discard, or edit skills.
+
+## Phase 4 — Curation
+
+### 4a. Discovery
 
 Before doing anything else, get a complete picture of the registry:
 
-1. **Read `knowledge/issues/INDEX.md`** — get all issue IDs, titles, categories,
+1. **Read `knowledge/issues/INDEX.md`** — all issue IDs, titles, categories,
    certainties, and occurrence counts
 2. **Read every issue file in `open/`** — full content of each
 3. **Read every issue file in `promoted/`** — to avoid re-promoting
 4. **Read every issue file in `discarded/`** — to detect re-emerging patterns
    (if a discarded issue appears again, it may need re-evaluation)
 
-### Phase 1 — Deduplication (NEW)
+### 4b. Deduplication
 
 Before promoting or recategorizing, eliminate duplicates:
 
@@ -65,16 +72,17 @@ Deduplication uses heuristic keyword matching — it may miss some duplicates
 or flag false positives. When uncertain, leave both issues in `open/` and
 add a note for manual review.
 
-### Phase 2 — Recategorization (NEW)
+### 4c. Recategorization
 
 Review issues with `category: unknown` or potentially miscategorized entries:
 
 1. **Read each `unknown` issue** and attempt to classify:
-   - Look for language/framework names → `library-api`
-   - Look for shell/terminal commands → `powershell`
-   - Look for Angular-specific patterns → `angular`
-   - Look for Git operations → `git`
-   - Look for project-specific paths/conventions → `project-specific`
+   - A specific library's API changed → `library-api`
+   - Shell, terminal, or scripting behavior → `powershell`
+   - A framework's conventions or lifecycle → `framework`
+   - Git operations → `git`
+   - Project-specific paths or conventions → `project-specific`
+   - A recurring domain with no existing skill → `skill-creation`
 2. **Update the `category` field** in the issue frontmatter
 3. **Update `INDEX.md`** to reflect the new category
 4. **If still unclear**, leave as `unknown` and add a note:
@@ -86,27 +94,29 @@ Review issues with `category: unknown` or potentially miscategorized entries:
 Also scan non-unknown issues for obvious miscategorization and fix if
 the correct category is unambiguous.
 
-### Phase 3 — Evaluate Promotion Criteria
+## Phase 5 — Promotion
 
-For each issue with `certainty: high` (3+ occurrences):
+For each issue with `certainty: high` (3+ occurrences), route it using the
+category table in `knowledge/issues/INDEX.md`. **That table is the single source
+of truth for promotion targets** — read it rather than relying on memory, because
+it is meant to grow as new categories emerge.
 
-| Category | Promotion Target | Action |
-|----------|-----------------|--------|
-| `library-api` | `/memories/<lib>-api.md` | Check if memory file exists; if so, `str_replace` to add. If not, `create`. |
-| `powershell` | `powershell-patterns/SKILL.md` | `replace_string_in_file` to add new pitfall/pattern. |
-| `angular` | `/memories/` or angular skill | If Angular-specific API version info → user memory. If scaffold pattern → angular-scaffold skill. |
-| `git` | `git-workflow/SKILL.md` | `replace_string_in_file` to add new pattern. |
-| `skill-creation` | New `.github/skills/<name>/SKILL.md` | Load `skill-creator` skill and follow its procedure to create a new skill from scratch. |
-| `project-specific` | `/memories/repo/` | Create or update repo memory file. |
-| `unknown` | — | Do NOT promote. Leave in `open/` with recategorization note. |
+Whatever the target:
+
+- To extend an existing skill, use the agent's targeted-edit tool and add a new
+  section rather than rewriting the file. Re-read the file immediately before
+  editing; another session may have changed it.
+- To create a new skill, **load `skill-creator` first** and follow its procedure.
+- To write a memory file, create it if absent, append a section if present.
 
 After promotion:
+
 1. Move issue file from `open/` to `promoted/`
 2. Update issue frontmatter: `status: promoted`, add `reviewed_by: "ai-engineer"`,
    add resolution date
 3. Update `INDEX.md`: remove from Open, add to Promoted table with `Reviewed By`
 
-### Phase 4 — Periodic Cleanup
+## Phase 6 — Cleanup
 
 For issues in `open/` with:
 - `occurrences: 1` AND `first_seen > 30 days ago`
@@ -116,9 +126,9 @@ For issues in `open/` with:
 `reviewed_by: "ai-engineer"`, add reason: "Single occurrence, >30 days without recurrence."
 
 For issues previously discarded that have re-emerged (found new evidence in
-Phase 0), move back to `open/` and increment occurrences.
+Phase 4a), move back to `open/` and increment occurrences.
 
-### Phase 5 — Report
+## Report
 
 Output a comprehensive summary table:
 
@@ -138,7 +148,7 @@ Output a comprehensive summary table:
 ### Promotion
 | ID | Title | Category | Promoted To | Occurrences |
 |----|-------|----------|-------------|-------------|
-| 📦 Promoted | ISSUE-003 | powershell | powershell-patterns/SKILL.md | 3 |
+| 📦 Promoted | ISSUE-003 | powershell | powershell-patterns skill | 3 |
 
 ### Cleanup
 | ID | Title | Action | Reason |
@@ -158,16 +168,15 @@ Output a comprehensive summary table:
 1. **Review ALL issues, not just recent ones.** Unlike `developer` which only
    looks at the current session, the AI Engineer has a global view.
 
-2. **ALWAYS get user confirmation before promoting to a skill** — use
-   `vscode_askQuestions` to ask: "I found pattern X occurring 3 times.
-   Promote to a skill?" Unless the user previously said "always auto-promote."
+2. **ALWAYS get user confirmation before promoting to a skill** — use the agent's
+   question mechanism to ask: "I found pattern X occurring 3 times. Promote to a
+   skill?" Unless the user previously said "always auto-promote."
 
-3. **Prefer updating existing skills over creating new ones** — a new pitfall
-   in PowerShell belongs in `powershell-patterns/SKILL.md`, not a new skill.
+3. **Prefer updating existing skills over creating new ones** — a new shell
+   pitfall belongs in the `powershell-patterns` skill, not a new skill.
 
-4. **When creating a new skill, load `skill-creator`** — the `skill-creator`
-   skill has the full procedure for creating skills per the agentskills.io
-   spec and prompt-forge conventions. Follow it exactly.
+4. **When creating a new skill, load `skill-creator`** — it has the full procedure
+   per the agentskills.io spec and prompt-forge conventions. Follow it exactly.
 
 5. **Set `reviewed_by` on every issue you touch** — this provides an audit
    trail. Use `reviewed_by: "ai-engineer"` for automated reviews.
@@ -188,7 +197,6 @@ Output a comprehensive summary table:
 | Open issues | `knowledge/issues/open/ISSUE-XXX.md` |
 | Promoted issues | `knowledge/issues/promoted/ISSUE-XXX.md` |
 | Discarded issues | `knowledge/issues/discarded/ISSUE-XXX.md` |
-| User memory | `/memories/<topic>.md` |
-| Repo memory | `/memories/repo/<topic>.md` |
-| Skills | `.github/skills/<name>/SKILL.md` |
+| Project memory | `knowledge/memory/<topic>.md` |
+| Skills | the project's skills directory (see `AGENTS.md` / `CLAUDE.md`) |
 | Sync script | `sync-skills.ps1` |
