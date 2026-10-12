@@ -1,81 +1,59 @@
-# Agent Instructions
+# Agent Instructions: maintaining prompt-forge
 
-This project uses **prompt-forge**: a set of Agent Skills plus a learning loop
-that records recurring problems and promotes the confirmed ones into permanent
-guidance.
+This repository is the prompt-forge toolkit itself, not a project that uses it.
+What users install lives in `template/`; everything else is documentation,
+installers, and maintainer scripts.
 
-This file is the single source of truth for agent instructions. It is read
-natively by VS Code, GitHub Copilot, Codex, Cursor, Windsurf, Zed, Aider and
-others. Claude Code reads it through the `@AGENTS.md` import at the top of
-`CLAUDE.md`.
+## Layout
 
-## Startup Sequence
+| Path | What it is |
+|---|---|
+| `template/` | Exactly what `install.sh` / `install.ps1` put into a project |
+| `template/.agents/skills/` | **Source of truth** for the shipped skills |
+| `template/.claude/skills/` | Generated copy for Claude Code. Never edit by hand |
+| `template/.claude/agents/` | The `curate-lessons` subagent (Claude Code, also read by VS Code and Cursor) |
+| `template/AGENTS.md` | The block merged into a project's `AGENTS.md`, between markers |
+| `template/knowledge/` | The empty knowledge skeleton, including the team policy `README.md` |
+| `install.sh`, `install.ps1` | Installers; keep their behavior identical |
+| `scripts/` | Maintainer scripts: sync, validation, installer tests |
+| `examples/` | A fictional registry showing the loop end to end |
+| `architecture.md` | Decision record (ADRs). Add an ADR for any design change |
 
-1. **Discover the skills.** List the directories under this project's skills
-   directory: `.claude/skills/` if it exists, otherwise `.github/skills/`. If
-   your agent discovers skills natively, it has already done this — skip to
-   step 3.
+The shipped skills are not loaded natively in this repository. When a task
+touches PowerShell, git, or skill authoring, read the matching file in
+`template/.agents/skills/` yourself.
 
-2. **Read only the frontmatter** of each `SKILL.md` — the block between the first
-   two `---` delimiters. That is the `name` and `description`, about 100 tokens
-   per skill. Do not read the bodies yet.
+## After changing anything in `template/`
 
-3. **Load on match.** Compare the task against each description. Read the full
-   `SKILL.md` body only for the skills that match. This is progressive
-   disclosure: discovery is cheap, bodies are not.
+Run these from the repository root and fix what they report:
 
-4. **`developer` is the exception** — load it immediately, every session. It
-   handles issue tracking and applies to all work.
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/sync-template.ps1
+powershell -ExecutionPolicy Bypass -File scripts/validate.ps1
+powershell -ExecutionPolicy Bypass -File scripts/test-install.ps1
+bash scripts/test-install.sh
+```
 
-5. **Check for existing errors** before making changes. Use the agent's
-   diagnostics if it has them, otherwise run the project's lint or build command.
-   Fix what is already broken first.
+`validate.ps1` measures each skill body (characters / 4, rounded to 0.1k). Copy
+the measured value into `metadata.tokens` when it reports a mismatch.
 
-## During the Session
+## Rules
 
-- Run the `developer` skill at the end of every significant iteration, or when
-  the user signals a task is done. It records issues in `knowledge/issues/open/`
-  and never promotes or modifies skills.
-- Run `ai-engineer` as a subagent when the user asks to organize knowledge, clean
-  up issues, or promote patterns. It is the only role allowed to promote,
-  discard, or edit skills.
-- When you hit an error, an API change, or a workaround worth remembering, note
-  it. `developer` will formalize it into the registry at the end of the session.
+- Skills name capabilities, not one vendor's tool names ("the agent's file-edit
+  tool", not `replace_string_in_file`). Concrete names only as examples.
+- Every factual claim about a tool, spec, or study needs a primary source. Date
+  claims that can go stale ("as of 2026-10").
+- Installers must never overwrite a user's file. Add a test case to both
+  `scripts/test-install.*` for any new behavior.
+- Record user-visible changes in `CHANGELOG.md`.
+- Conventional Commits, one logical change per commit. Branches:
+  `feature/`, `fix/`, `docs/`, `chore/`, `refactor/`.
 
 ## Terminal on Windows
 
-These rules are ambient — they apply even when the `powershell-patterns` skill
-has not been triggered. Load that skill for the full set.
-
-- `powershell.exe` is Windows PowerShell 5.1; `pwsh` is PowerShell 7.x. Check
-  `$PSVersionTable.PSVersion` before using `&&`, `||`, or ternary syntax — they
-  are 7.x only and are a parser error in 5.1. Sequence with `;`, or
-  `cmd1; if ($?) { cmd2 }` when the second command depends on the first.
-- Check `$LASTEXITCODE` after a native executable. Do not infer success from
-  stdout.
-- Never write files containing `{{ }}` or `${{ }}` through shell redirection or
-  an interpolating here-string. Use the agent's file-creation or edit tool.
-- Never run a cmdlet that blocks on stdin (`Read-Host`, `Get-Credential`,
-  `pause`) or opens an editor. The agent shell has no usable stdin.
-
-## Git
-
-Conventional Commits v1.0.0. One logical change per commit.
-
-```
-feat:     New feature
-fix:      Bug fix
-docs:     Documentation
-chore:    Build, deps, tooling
-refactor: Code change, no fix or feature
-test:     Adding or correcting tests
-```
-
-Branch naming: `feature/<name>`, `fix/<name>`, `docs/<name>`, `chore/<name>`.
-
-See the `git-workflow` skill for breaking changes, stacked PRs, and worktrees.
-
-## After Each Session
-
-1. Run the `developer` skill to capture learnings into the issue registry.
-2. Commit changes to `knowledge/` and any updated skills.
+The maintainer shell is usually Windows PowerShell 5.1: no `&&` or `||`, check
+`$LASTEXITCODE` after native commands, and write files containing `$` or `${{ }}`
+with the file-edit tool rather than a here-string. From PowerShell, plain `bash`
+starts WSL, not Git Bash; run the bash tests with
+`& "C:\Program Files\Git\bin\bash.exe" scripts/test-install.sh`. The full set of
+rules is in `template/.agents/skills/powershell-patterns/SKILL.md`.

@@ -2,98 +2,179 @@
 
 ## Purpose and Scope
 
-This document describes the architecture of prompt-forge, a drop-in toolkit that
-adds Agent Skills and a learning loop to any
-software project. It is written for contributors and maintainers who need to
-understand why the system is shaped the way it is, and for users evaluating
-whether prompt-forge fits their development workflow.
+This document describes the architecture of prompt-forge, a drop-in toolkit
+that gives a team's AI coding agents a shared, reviewed memory. It is written for
+contributors who need to understand why the system is shaped the way it is, and
+for teams deciding whether it fits their workflow.
 
-The document follows the conventions of Architectural Decision Records (ADR) as
+It follows the conventions of Architectural Decision Records (ADR) as
 popularized by Michael Nygard and formalized by the MADR project. Each
 architecturally significant choice is presented with its context, the options
-considered, the decision made, and the resulting consequences.
+considered, the decision, and its consequences. Superseded decisions stay in the
+log with a status line, so the reasoning behind the current design remains
+traceable.
+
+The sections before the decision log describe the design as of 2.0.0.
 
 ---
 
 ## System Context
 
-prompt-forge is not a standalone application. It is a set of inert files that
-are copied into a host project, where they are interpreted by an AI coding agent
-at runtime. The agent -- typically GitHub Copilot, Claude Code, or Codex -- reads
-the Markdown skill files on demand and follows their instructions to enhance its
-own behavior.
+prompt-forge is not an application. It is a set of inert files that the
+installer merges into a host repository, where AI coding agents interpret them
+at run time.
 
 ```
-Host Project
-+--------------------------------------------------+
-|  AGENTS.md              (agent instructions)     |
-|  CLAUDE.md              (thin, imports AGENTS.md)|
-|  <skills-dir>/          (6 SKILL.md files)       |
-|  <agents-dir>/          (ai-engineer subagent)   |
-|  knowledge/issues/      (registry + issues)      |
-|  knowledge/memory/      (promoted facts)         |
-+--------------------------------------------------+
-         |
-         | read & execute on demand
-         v
-+-------------------+
-|   AI Coding Agent |
-|  (Copilot, Claude |
-|   Code, Codex)    |
-+-------------------+
+Host repository
++------------------------------------------------------------------+
+|  AGENTS.md            your instructions + the prompt-forge block  |
+|  CLAUDE.md, GEMINI.md one-line @AGENTS.md imports                 |
+|  .agents/skills/      record-lesson, curate-lessons, git-workflow,|
+|                       powershell-patterns                         |
+|  .claude/skills/      identical copy for Claude Code              |
+|  .claude/agents/      curate-lessons subagent                     |
+|  knowledge/README.md  the team's policy                           |
+|  knowledge/lessons/   candidate lessons (any teammate's agent)    |
+|  knowledge/memory/    verified facts (curation PRs only)          |
++------------------------------------------------------------------+
+        ^ read and written by                 ^ reviewed by
+        | Claude Code, Copilot, Codex,         | people, through
+        | Cursor, Gemini CLI, ...              | pull requests
 ```
 
-`<skills-dir>` is `.github/skills/` for VS Code-hosted agents and
-`.claude/skills/` for Claude Code; `<agents-dir>` follows the same split.
-
-There is no runtime, no server process, no database, and no build step. The
-toolkit is purely declarative: Markdown files encode instructions and the agent
-is the interpreter. The single PowerShell script in the repository is a
-maintainer tool and is not shipped to host projects.
+There is no runtime, server, database, or network access. The installers
+(`install.sh`, `install.ps1`) run once from a clone of this repository and are
+not copied into the host. The scripts under `scripts/` are maintainer tools.
 
 ---
 
 ## Architectural Principles
 
-These principles are non-negotiable. Every design decision in this document is
-evaluated against them.
+These principles are non-negotiable. Every decision below is evaluated against
+them.
 
 **Principle 1: Zero runtime dependencies.**
-The toolkit must work in any project without requiring npm installs, Python
-virtual environments, or any other package manager invocation. What ships to a
-host project is Markdown and nothing else -- no scripts, no interpreter, no
-platform assumption. `sync-skills.ps1` lives outside every package and is run
-only by prompt-forge maintainers on Windows.
+What lands in a host repository is Markdown. Installing needs git plus bash or
+PowerShell, both of which a development machine already has. Nothing needs to
+keep running afterwards.
 
 **Principle 2: Host-project safety.**
-prompt-forge files must never interfere with the host project's own build
-system, testing framework, linting configuration, or version control hygiene.
-The `.gitignore` shipped with prompt-forge covers only prompt-forge artifacts;
-it does not impose opinions about how the host project should structure its own
-ignore rules.
+prompt-forge must never break or silently overwrite a host project's files. The
+installers merge marked blocks and import lines, create knowledge files only
+where missing, and replace only prompt-forge's own skills, and only on an
+explicit upgrade.
 
-**Principle 3: Progressive disclosure.**
-AI agents have limited context windows, and every token loaded is a token that
-cannot be used for the actual task. Skills expose minimal metadata at discovery
-time and load their full instruction body only when the conversation context
-matches the skill's trigger description. This is the same principle used by
-Codex and Claude Code in their own skill systems.
+**Principle 3: Progressive disclosure, and a small footprint.**
+Every token loaded into an agent competes with the task. Skills expose only
+their name and description until a task matches. Memory files are budgeted and
+read only when their description matches. Research on context files
+([Gloaguen et al., 2026](https://arxiv.org/abs/2602.11988)) finds cost goes up
+and success does not reliably follow, so less is the default.
 
-**Principle 4: Git-native knowledge persistence.**
-The issue registry uses the filesystem as its database. Each issue is a
-Markdown file in a directory. This means knowledge is version-controlled,
-diffable, mergeable, and survives independently of any external service.
+**Principle 4: Git-native, reviewed knowledge.**
+Knowledge is Markdown in the repository: diffable, mergeable, and reviewed like
+code. A pull request is the approval mechanism and git history is the audit
+trail.
 
 **Principle 5: Agent-agnostic design.**
-No skill assumes a specific AI coding agent. Skills name **capabilities**, not
-vendor tool names: "the agent's targeted-edit tool", not `replace_string_in_file`;
-"content search", not `grep_search`. Concrete names appear only as parenthetical
-examples, never as the sole instruction, because the same skill file is shipped
-verbatim to every provider package. Instructions live in `AGENTS.md`, the
-cross-tool standard, with a thin `CLAUDE.md` importing it for Claude Code.
+Instructions live in `AGENTS.md`, the cross-tool standard. Skills follow the
+[Agent Skills specification](https://agentskills.io/specification) and live in
+`.agents/skills/`, the location most agents read. Skills name capabilities
+("the agent's file-edit tool"), not one vendor's tool names. Where a major agent
+needs its own path or file (Claude Code's `.claude/skills/`, Gemini CLI's
+`GEMINI.md`), prompt-forge generates a copy or a one-line shim instead of a
+second source.
 
-Skills also avoid hardcoding the skills directory, since it differs per provider.
-Only `AGENTS.md` and `CLAUDE.md` name concrete paths.
+---
+
+## Current Design (2.0)
+
+### Components
+
+| Component | Role |
+|---|---|
+| `AGENTS.md` block | Tells every agent to read matching memory before a task, and to run `record-lesson` at checkpoints. Lives between `<!-- prompt-forge:start -->` and `<!-- prompt-forge:end -->` so upgrades can replace it without touching the team's own text |
+| `record-lesson` skill | Admission test, redaction, then creates `knowledge/lessons/<slug>.md` or appends a sighting. Writes nowhere else |
+| `curate-lessons` skill | On explicit request only. Merges, screens, counts, promotes along the ladder, retires stale memory, and returns a decision table for a pull request. Never merges or pushes |
+| `curate-lessons` subagent | Runs the skill in its own context in Claude Code (also read by VS Code and Cursor). Cannot ask questions, so it reports open decisions |
+| `git-workflow`, `powershell-patterns` | General agent pitfalls. Shipped, versioned, and never edited by curation |
+| `knowledge/README.md` | The team's policy: thresholds, budgets, cadence. Team-owned; upgrades never touch it |
+| `knowledge/lessons/` | Candidates, one file per root cause, with an append-only `Sightings` list |
+| `knowledge/memory/` | Verified facts, one topic per file, each with a `description` line, a budget, and `review after` dates |
+
+### Data flow
+
+```mermaid
+flowchart LR
+    A["Any teammate's agent<br/>hits a non-obvious failure"] --> B["record-lesson<br/>(at a checkpoint)"]
+    B --> C["knowledge/lessons/&lt;slug&gt;.md<br/>new file or new sighting"]
+    C -->|"ships in the normal PR"| D[("main")]
+    D --> E["curate-lessons<br/>(on request, own branch)"]
+    E --> F{"Eligible?<br/>2+ distinct reporters"}
+    F -->|"no"| G["Hold or wait;<br/>delete if stale or unsafe"]
+    F -->|"yes"| H["Ladder: fix code, add check,<br/>memory entry, team skill"]
+    H --> I["Curation PR with<br/>decision table"]
+    I -->|"CODEOWNERS review, merge"| J["knowledge/memory/"]
+    J -->|"read when description matches"| A
+```
+
+### Token economics
+
+| Cost | Size | When |
+|---|---|---|
+| Skill discovery | ~100 tokens per skill, ~400 in total | Every session, by the agent's own skill loader |
+| `AGENTS.md` block | ~300 tokens | Every session |
+| `record-lesson` body | ~1.1k tokens | Only when a lesson is worth recording |
+| `curate-lessons` body | ~1.6k tokens | Only in a curation run, ideally in a subagent |
+| `knowledge/memory/` | Budgeted at ~2k tokens in total; agents read only matching files | Per task |
+
+1.x loaded its recording skill (~1.2k tokens) into every session. 2.0 loads no
+skill eagerly, so a session that records nothing pays only for discovery and the
+`AGENTS.md` block.
+
+### Multi-developer behavior
+
+- **New lessons** are separate files, so parallel branches do not conflict. Two
+  people creating the same slug on the same day produce an add/add conflict,
+  which is the right signal: merge the two sighting lists.
+- **New sightings** are appended lines. Two branches adding a sighting to the
+  same lesson conflict at the end of the file; keeping both lines always
+  resolves it, and `merge=union` for `knowledge/lessons/*.md` makes git do that
+  automatically ([team setup](docs/team-setup.md)). Counts stay correct because
+  they are derived from the lines rather than stored.
+- **Memory** is changed by agents only in curation runs, which land one at a
+  time through CODEOWNERS review. People may delete a wrong entry in any pull
+  request.
+
+### Security
+
+See [SECURITY.md](SECURITY.md) for the threat model. In short: lessons must be
+paraphrased and redacted; lesson text is data, never instructions; the curator
+rejects lessons that address the agent or ask for code execution or permission
+changes; and everything an agent loads by default passes human review.
+
+### Known limitations
+
+- Recording depends on agents following `AGENTS.md`. No hook enforces it yet;
+  the pull request checklist is the human backstop.
+- Duplicate checks and the admission test are judgment calls made by a model.
+  Curation review is the safety net.
+- Tools that read both `.agents/skills/` and `.claude/skills/` may list skills
+  twice. See [docs/known-issues.md](docs/known-issues.md).
+- There is no evaluation yet of whether promoted memory improves outcomes.
+
+### Maintenance
+
+| Task | Command |
+|---|---|
+| Regenerate the Claude Code copy of the skills | `scripts/sync-template.ps1` |
+| Check for drift (CI) | `scripts/sync-template.ps1 -Check` |
+| Validate frontmatter, token counts, and links | `scripts/validate.ps1` |
+| Test the installers | `scripts/test-install.ps1`, `bash scripts/test-install.sh` |
+
+`metadata.tokens` is the body's character count divided by 4, rounded to 0.1k,
+measured on LF line endings (`.gitattributes` enforces LF). `validate.ps1`
+prints the measured value.
 
 ---
 
@@ -140,6 +221,10 @@ keeping the frontmatter minimal.
 ---
 
 ### ADR-002: Filesystem-Based Issue Registry
+
+> **Amended by ADR-013 (2026-10-12).** Markdown files in git remain the store,
+> but `INDEX.md` and the status folders were removed: a lesson is one file with
+> an append-only list of sightings.
 
 **Context.**
 The learning loop needs persistent storage for tracking issues across
@@ -231,6 +316,9 @@ outside every package.
 
 ### ADR-004: Progressive Disclosure for Skill Loading
 
+> **Amended by ADR-015 (2026-10-12).** Progressive disclosure stands, but no
+> skill is loaded eagerly any more. The recording skill runs at checkpoints.
+
 **Context.**
 An AI coding agent may have access to dozens of skills in a project. Loading
 all skill bodies eagerly would consume context window tokens that could be used
@@ -263,8 +351,8 @@ current task context.
 **Rationale.**
 This is the pattern used by Codex, Claude Code, and the agentskills.io
 standard. It provides the best balance of token efficiency and triggering
-accuracy. Six hundred tokens is negligible compared to the context window of
-modern models (1M tokens for DeepSeek V4, Claude Opus 4.8, GPT-5.4). The
+accuracy. Six hundred tokens is small next to the context windows of current
+models. The
 descriptions act as an embedding-free semantic router: the model itself
 determines relevance, which is more accurate than keyword matching.
 
@@ -281,7 +369,10 @@ request. Only `developer` is loaded eagerly, every session.
 
 ---
 
-### ADR-005: UUID-Based Issue Identifiers
+### ADR-005: UUID-Based Issue Identifiers ~~(Superseded)~~
+
+> **Superseded by ADR-013 (2026-10-12).** A lesson is named by a slug of its
+> root cause; same-day duplicates surface as an add/add conflict to merge.
 
 **Context.**
 The issue registry assigns an identifier to each issue. The initial design used
@@ -333,7 +424,10 @@ both branches.
 
 ---
 
-### ADR-006: Three-Occurrence Promotion Threshold
+### ADR-006: Three-Occurrence Promotion Threshold ~~(Superseded)~~
+
+> **Superseded by ADR-013 (2026-10-12).** Eligibility now counts distinct
+> reporters: 2 or more people, or 3 or more sightings on 2 or more days.
 
 **Context.**
 The learning loop detects patterns -- errors, API changes, workarounds -- and
@@ -376,7 +470,11 @@ stale single-occurrence entries.
 
 ---
 
-### ADR-007: Category-Based Promotion Routing
+### ADR-007: Category-Based Promotion Routing ~~(Superseded)~~
+
+> **Superseded by ADR-013 (2026-10-12).** A promotion ladder (fix the code, add
+> a check, write memory, create a skill) replaced the routing table. Categories
+> remain only to group lessons.
 
 **Context.**
 When an issue reaches promotion threshold, the system must decide where to
@@ -472,6 +570,9 @@ excludes files the host project needs.
 
 ### ADR-009: Curated Skills with Role Separation
 
+> **Amended by ADR-016 (2026-10-12).** The roles are now `record-lesson` and
+> `curate-lessons`; `explore-codebase` and `skill-creator` were removed.
+
 **Context.**
 The toolkit needs an initial set of skills that demonstrate value. Too few
 skills would make the toolkit feel empty. Too many would increase the
@@ -536,6 +637,11 @@ trying to anticipate every need upfront.
 
 ### ADR-010: YAML Frontmatter as the Extension Point
 
+> **Amended (2026-10-12).** Top-level fields are limited to the Agent Skills
+> specification, plus the `disable-model-invocation` client extension on
+> `curate-lessons`. prompt-forge's own fields live under `metadata`, and
+> `scripts/validate.ps1` enforces this.
+
 **Context.**
 The skill format needs to evolve over time. New fields may be added to support
 new features (source attribution, version tracking, compatibility hints).
@@ -555,8 +661,8 @@ by parsers that do not recognize them.
 
 **Decision.**
 Use YAML frontmatter with only `name` and `description` as required fields.
-All other fields (`license`, `metadata`, `disable-model-invocation`, `url`,
-`sources`, `tokens`, `version`) are optional. The `metadata` block itself is
+All other fields (`license`, `metadata`, `disable-model-invocation`, and,
+under `metadata`, `url`, `sources`, `tokens`, `version`) are optional. The `metadata` block itself is
 a nested optional namespace for extended attributes.
 
 **Rationale.**
@@ -577,9 +683,11 @@ below.
 
 ---
 
-### ADR-011: Provider-Specific Distribution Packages
+### ADR-011: Provider-Specific Distribution Packages ~~(Superseded)~~
 
-> **Amended by ADR-012 (2026-08-09).** The three packages became two once
+> **Superseded by ADR-014 (2026-10-12)**, after being amended by ADR-012
+> (2026-08-09). One template and a merging installer replaced the packages.
+> Originally: the three packages became two once
 > instructions moved to `AGENTS.md`. The reasoning below still holds for the
 > skills and agents directories, which remain provider-specific.
 
@@ -642,6 +750,11 @@ directories in each package.
 
 ### ADR-012: AGENTS.md as the Single Instruction Surface
 
+> **Amended by ADR-014 (2026-10-12).** `AGENTS.md` remains the single source,
+> now shipped as a marked block merged into the host's own file. Claude Code has
+> read `AGENTS.md` natively since v2.1.277 when no `CLAUDE.md` exists; the
+> `@AGENTS.md` import is kept because it works in every version.
+
 **Context.**
 By August 2026 the instruction layer had fragmented into four near-duplicate
 copies of the same startup sequence: `.github/copilot-instructions.md`,
@@ -651,8 +764,8 @@ guide. They had already drifted apart. Every future edit meant four edits, and
 `sync-skills.ps1` covered only two of them.
 
 Meanwhile the ecosystem converged. `AGENTS.md` is an open format stewarded by the
-Agentic AI Foundation under the Linux Foundation, adopted by 20+ tools and 60k+
-repositories. VS Code reads it natively from the workspace root
+Agentic AI Foundation under the Linux Foundation, which agents.md reports is used by over 60k
+open-source projects. VS Code reads it natively from the workspace root
 (`chat.useAgentsMdFile`), as do Codex, Cursor, Windsurf, Zed, Aider and Jules.
 
 **Options considered.**
@@ -698,256 +811,203 @@ conversion step.
 
 ---
 
-## Component Architecture
+### ADR-013: Lessons with Sightings, Promoted Through Pull Requests
 
-### Skill System
+> **Status: Accepted (2026-10-12).** Supersedes ADR-005, ADR-006, and ADR-007,
+> and the `INDEX.md` part of ADR-002.
 
-Each skill is a self-contained directory under the provider's skills directory
-(`.github/skills/<name>/` or `.claude/skills/<name>/`), containing exactly one
-`SKILL.md` file. The directory structure allows future
-extension: a skill could add supplementary files (examples, templates,
-references) without changing the core format.
+**Context.**
+A review of 1.x for team use found that the registry broke down exactly where
+teams differ from individuals:
 
-The `SKILL.md` file has two parts. The YAML frontmatter block between `---`
-delimiters contains structured metadata. The Markdown body after the second
-`---` contains the instructions the agent follows when the skill is triggered.
+- `INDEX.md` changed on almost every recording (rows, summary counts, the date),
+  so it conflicted on most parallel pull requests.
+- Stored counters lost updates silently. Two branches that each change
+  `occurrences: 1` to `2` merge cleanly to `2`.
+- `occurrences` could not tell one developer's misconfigured machine from five
+  developers hitting the same pitfall.
+- Approval happened in chat, from whoever was at the keyboard, with an "always
+  auto-promote" escape hatch. In Claude Code the approval question could not even
+  be asked, because subagents do not have the question tool.
+- Promotions edited the skills prompt-forge ships, so the next upgrade erased
+  them, and nothing told agents to read `knowledge/memory/` at all.
 
-The frontmatter schema used by prompt-forge extends the base agentskills.io
-schema with additional fields:
+**Options considered.**
 
-```
-Field                   Required    Purpose
-name                    Yes         Machine-readable skill identifier
-description             Yes         Natural-language trigger conditions
-license                 No          SPDX license identifier
-disable-model-invocation No         If true, skill is only loaded on explicit user request
-metadata.author         No          Skill author (GitHub username)
-metadata.url            No          Canonical URL for the skill source
-metadata.version        No          Semantic version of the skill
-metadata.tokens         No          Estimated token count of the body
-metadata.sources        No          Comma-separated list of reference URLs
-```
+A. Keep the registry and fix the bugs: a generated `INDEX.md`, a script to
+recount. Keeps three status folders and a table nobody needs, and adds a
+dependency on running the script.
 
-### Issue Registry
+B. Move the registry to an issue tracker. Breaks Principle 1 and Principle 5.
 
-The issue registry uses a flat-file structure under `knowledge/issues/`. The
-entry point is `INDEX.md`, which maintains three tables (Open, Promoted,
-Discarded) and a summary count. Individual issue files live in the `open/`,
-`promoted/`, or `discarded/` subdirectory corresponding to their status.
+C. One file per lesson with an append-only list of sightings; no index and no
+status folders; counts derived from the sightings; promotion through a pull
+request; memory budgeted and read on demand.
 
-When an issue is promoted from open to promoted, the file is physically moved
-from `open/` to `promoted/` and its frontmatter is updated. The `INDEX.md`
-table is updated to reflect the move. The same process applies to discarding.
+**Decision.**
+Option C.
 
-The promotion routing table in `INDEX.md` maps issue categories to promotion
-targets. This table is the single source of truth for where knowledge ends up.
-It can be extended by editing `INDEX.md` directly.
+- A lesson is `knowledge/lessons/<slug>.md` with a fixed frontmatter and a
+  `Sightings` list of `date | @reporter | branch | agent | symptom` lines.
+- A lesson is eligible with 2 or more distinct reporters. A single reporter's
+  lesson is held, however often it recurs, unless a person fast-tracks it. Teams
+  can change this in `knowledge/README.md`.
+- The curator takes the cheapest durable fix (code, then a check, then memory,
+  then a skill), works on its own branch, and reports a decision table. Merging
+  the pull request is the approval.
+- Promoted or rejected lessons are deleted; git history is the archive. A lesson
+  whose fix was proposed (code or a check) keeps a `fix:` field until the fix
+  lands.
+- Memory files carry a `description` line and `review after` dates, within a
+  budget. `AGENTS.md` tells agents to read the files that match their task.
 
----
+**Rationale.**
+Appended lines merge predictably (both sides are kept, by hand or with
+`merge=union`), and deriving counts from lines makes lost updates impossible. Counting distinct reporters matches
+what a team cares about: a problem that costs several people time. Review through
+pull requests uses machinery every team already trusts, works the same for
+every agent, and records who approved what. The ladder and the budget answer the
+evidence that context files are costly and often unhelpful.
 
-## Data Flow: The Learning Cycle
-
-The learning cycle is composed of two roles — `developer` (recording) and
-`ai-engineer` (curation) — spanning six phases:
-
-```mermaid
-flowchart TD
-    subgraph Automatic["Every Session — Automatic"]
-        A["Coding Session"] --> B["developer skill
-(always loaded)"]
-        B --> C["Phase 1: Detection
-(errors, APIs, workarounds)"]
-        C --> D["Phase 2: Cross-Reference
-(match against open/)"]
-        D --> E["Phase 3: Recording
-(create/update issues in open/)"]
-    end
-
-    subgraph Manual["Periodic — Manual Invocation"]
-        F["User: 'organize knowledge'"] --> G["ai-engineer subagent
-(on-demand)"]
-        G --> H["Phase 4: Curation
-(deduplicate + recategorize)"]
-        H --> I{"Phase 5: certainty=high
-AND 3+ occurrences?"}
-        I -->|Yes| J["Promote to skill or memory
-(move to promoted/)"]
-        I -->|No| K{"Phase 6: >30 days
-AND 1 occurrence?"}
-        K -->|Yes| L["Discard
-(move to discarded/)"]
-        K -->|No| M["Leave in open/
-(wait for more evidence)"]
-    end
-
-    E -.->|"Accumulates issues
-over time"| F
-```
-
-**Phase 1 — Detection (during session).**
-As the developer works, the AI agent encounters errors, discovers API changes,
-or finds workarounds. The agent notes these mentally. The base skills
-(explore-codebase, git-workflow, powershell-patterns) provide immediate
-guidance to resolve the current problem.
-
-**Phase 2 — Cross-Reference (end of session, developer).**
-The `developer` skill scans the conversation for signals and cross-references
-each against existing issues in `open/` via keyword overlap.
-
-**Phase 3 — Recording (end of session, developer).**
-New signals create new issue files in `open/`. Existing signals increment
-occurrence counts and update certainty levels. The `developer` skill never
-promotes — it only records.
-
-**Phase 4 — Curation (on-demand, ai-engineer).**
-The `ai-engineer` subagent reviews ALL issues — deduplicating similar entries,
-recategorizing unknowns, and evaluating promotion candidates (3+ occurrences).
-
-**Phase 5 — Promotion (on-demand, ai-engineer).**
-Confirmed patterns are promoted to their target: skills, user memory, or repo
-memory. The issue file moves from `open/` to `promoted/`.
-
-**Phase 6 — Cleanup (on-demand, ai-engineer).**
-Stale single-occurrence issues (>30 days) are discarded. Re-emerging discarded
-patterns are re-evaluated.
-
-The cycle is intentionally asynchronous and two-tier. Recording (developer)
-happens automatically at session end. Curation (ai-engineer) happens only when
-explicitly invoked. This decoupling means the system does not need to be
-"always on"; it accumulates knowledge passively and curates actively.
+**Consequences.**
+`INDEX.md`, the status folders, `certainty`, `created_by`, and `reviewed_by` are
+gone. There is no single table of all lessons; listing the directory and reading
+the frontmatter replaces it. A team that never curates accumulates candidate
+lessons, but they cost nothing at run time because agents do not read
+`knowledge/lessons/` by default.
 
 ---
 
-## Token Economics
+### ADR-014: One Template, `.agents/skills/`, and a Merging Installer
 
-The token cost of prompt-forge breaks down into three components:
+> **Status: Accepted (2026-10-12).** Supersedes ADR-011. Amends ADR-012.
 
-```
-Component                  Token cost          When incurred
-Skill discovery            6 x ~100 = ~600     Start of every session
-Skill body (if triggered)  ~500-1,800 each     On first trigger per session
-Developer scan             Variable            End of session (explicit)
-```
+**Context.**
+1.0.0 shipped three packages (`packages/copilot`, `packages/claude`, and
+`packages/custom`), later reduced to two (`packages/vscode` with
+`.github/skills/`, `packages/claude` with `.claude/skills/`), each installed with
+a recursive copy. By late 2026:
 
-The discovery cost of 600 tokens is a fixed overhead per session. In a session
-that consumes 50,000 input tokens, this represents ~1.4% overhead. If the
-developer skill runs at session end, it scans the full conversation, which
-may cost several thousand additional tokens. However, this cost is amortized
-across future sessions that benefit from the promoted knowledge.
+- `.agents/skills/` had become the cross-tool location, read by Codex, Copilot
+  and VS Code, Cursor, Gemini CLI, OpenCode, Zed, and others. Codex and Cursor
+  never read `.github/skills/`, so the "VS Code package" did not reach them.
+- Claude Code still reads skills only from `.claude/skills/`. It reads a root
+  `AGENTS.md` natively since v2.1.277, but only when there is no `CLAUDE.md`.
+- A mixed team needs both layouts in the same repository, which two exclusive
+  packages could not provide.
+- The recursive copy silently overwrote an existing `AGENTS.md` or `CLAUDE.md`,
+  and on upgrade it reset the registry and erased promotions.
 
-The explore-codebase skill saves tokens by teaching the agent to use strategic
-search instead of sequential file reading. The skill's own documentation
-estimates a 91% reduction in exploration tokens. Even conservatively assuming
-a 50% reduction, the skill pays for itself within one or two sessions.
+**Options considered.**
 
----
+A. Keep two packages and document combining them. Pushes the problem onto every
+user.
 
-## Multi-Developer Considerations
+B. One layout using symlinks from `.claude/skills/` to `.agents/skills/`.
+Symlinks need Developer Mode or Administrator rights on Windows, and Claude
+Code's documentation advises against them there.
 
-The UUID-based issue ID scheme (ADR-005) eliminates filename collisions between
-developers. Two developers can create new issues simultaneously without
-coordination.
+C. One template with `.agents/skills/` as the source and a generated,
+byte-identical `.claude/skills/` copy, installed by scripts that merge instead of
+copying.
 
-The `INDEX.md` table remains a potential merge conflict point. When Developer A
-and Developer B both add rows to the Open Issues table in separate branches,
-Git will flag a conflict on merge. The resolution instructions embedded in
-`INDEX.md` guide the resolver: keep all rows from both branches and re-count
-the directories to update summary numbers. This is a manual step but a trivial
-one.
+**Decision.**
+Option C. `template/` is exactly what a project receives.
+`template/.agents/skills/` is the source of truth;
+`scripts/sync-template.ps1` regenerates the Claude Code copy, and CI fails on
+drift. `CLAUDE.md` and `GEMINI.md` are one-line `@AGENTS.md` shims. The
+installers merge the `AGENTS.md` block between markers, append import lines,
+create knowledge files only where missing, and replace prompt-forge's own skills
+only with `--upgrade`. Both installers share one test plan that runs in CI on
+Linux, macOS, and Windows.
 
-Skill files are modified less frequently than `INDEX.md`, but the same merge
-logic applies. When ai-engineer promotes an issue to a skill, it uses
-a targeted edit to add a new section. If two developers promote to the
-same skill simultaneously, the second promotion will see a stale file and need
-to re-read before editing. The ai-engineer skill instructs the agent to always
-read the current file state before editing, which mitigates but does not
-eliminate this race condition.
+The VS Code `.agent.md` definition of the curator was dropped. VS Code and
+Cursor both read `.claude/agents/`, and agents without a subagent format run the
+skill directly.
 
----
-
-## Security Considerations
-
-prompt-forge does not handle secrets, credentials, or user data. It writes no
-runtime artifacts and makes no network requests. The `.gitkeep` files in
-`knowledge/issues/` subdirectories are inert placeholders that ensure Git
-preserves empty directories. No sensitive data is stored in the repository.
-
-One caveat belongs to the learning loop rather than the toolkit: issue files
-record verbatim excerpts from coding sessions. If a session surfaced a
-credential or an internal hostname, the `developer` skill could copy it into
-`knowledge/issues/open/`, which is committed and shared. Review issue files in
-code review the same way you would review any other committed change.
-
-The skills instruct the AI agent to read, write, and edit files within the
-project. This is the agent's normal mode of operation; the skills do not grant
-any additional capabilities. No skill instructs the agent to make network
-requests or execute code outside the project boundary.
+**Consequences.**
+One install covers Claude Code, Copilot, Codex, Cursor, Gemini CLI, and the
+other `.agents/skills/` readers. Tools that read both skill directories may list
+each skill twice; `--skip-claude` avoids it for teams without Claude Code. The
+installers are now code that must be maintained on two shells, which the shared
+test plan keeps honest.
 
 ---
 
-## Known Limitations
+### ADR-015: Record at Checkpoints, Not by an Always-Loaded Skill
 
-**No concurrent write safety.**
-The filesystem-based issue registry has no locking mechanism. Two agents
-writing to `INDEX.md` simultaneously in the same working copy will produce a
-write conflict at the filesystem level. In practice, AI coding sessions are
-serial per developer, so this is unlikely to occur. The merge-time conflict
-resolution instructions handle the Git-level case.
+> **Status: Accepted (2026-10-12).** Amends ADR-004.
 
-**No automated issue deduplication.**
-The developer skill uses keyword overlap and category matching to detect
-duplicate issues (Phase 2), but this is heuristic. Two issues describing the same
-underlying problem with different wording may be created as separate files.
-The ai-engineer skill provides a second pass with its deduplication phase,
-but manual review during code review remains the safety net.
+**Context.**
+1.x loaded the `developer` skill at the start of every session and asked the
+agent to run it "at the end of every significant iteration". No skill can force
+itself to load; "end of iteration" is not an event a model can observe; and the
+body cost about 1.2k tokens in every session, far from the moment it was needed
+and often lost to context compaction.
 
-**Token estimates are approximate.**
-The `tokens` field in skill frontmatter uses the 4-characters-per-token
-estimate, which varies by model and tokenizer. Actual token counts may differ
-by 10-20%. The field is intended as a relative comparison tool, not an
-accounting-grade measurement.
+**Options considered.**
+
+A. Keep eager loading. Costly and unreliable.
+
+B. Lifecycle hooks (stop or session-end events). Deterministic, but each agent
+has its own format; hooks run code on teammates' machines; and session-end hooks
+in several agents cannot prompt the model at all.
+
+C. Tie recording to checkpoints the model does see (before a commit, before a
+pull request, when reporting a task as done) through the `AGENTS.md` block and
+the `git-workflow` skill, with a pull request checklist line as the human
+backstop. Keep hooks as a later, optional layer.
+
+**Decision.**
+Option C. `record-lesson` is an ordinary model-invocable skill whose description
+names those checkpoints, and it applies an admission test so that "no lesson" is
+the common outcome.
+
+**Consequences.**
+Sessions that record nothing pay only for skill discovery. Recording still
+depends on the model following instructions, so the [roadmap](ROADMAP.md) keeps
+optional hooks as the next step.
 
 ---
 
-## Maintenance
+### ADR-016: Verb Names for the Roles, and Fewer Generic Skills
 
-**Verifying token metadata.**
-Run the following command from the project root to compare declared token
-counts with actual character counts:
+> **Status: Accepted (2026-10-12).** Amends ADR-009.
 
-```powershell
-Get-ChildItem .github/skills/*/SKILL.md | ForEach-Object {
-    $content = Get-Content $_.FullName -Raw
-    $parts = $content -split '---', 3
-    $chars = $parts[2].Length
-    $est = [Math]::Round($chars / 4)
-    $declared = ($content -split "`n" | Select-String 'tokens:').ToString().Trim()
-    Write-Host "$($_.Directory.Name): $chars chars = ~$est tokens | $declared"
-}
-```
+**Context.**
+`developer` and `ai-engineer` read as personas: "ai-engineer" sounds like an
+agent that builds AI systems. Of the generic skills, `explore-codebase` rested on
+an unsourced "91% savings" figure and duplicated what current agents do
+natively, and `skill-creator` contained specification errors and shared its
+name with skills that Anthropic and Codex ship, where project-level skills take
+precedence.
 
-**Adding a new skill.**
-Create a directory under `.github/skills/<name>/` with a `SKILL.md` file.
-Follow the frontmatter schema documented above. Add the skill's trigger
-description. Measure the body token count using the script above and set the
-`tokens` field. The skill will be discovered automatically by the agent on
-the next session.
+**Decision.**
+Rename the roles `record-lesson` and `curate-lessons`. Remove
+`explore-codebase`. Fold the corrected skill-writing guidance into
+`curate-lessons/references/writing-skills.md`, loaded only when a lesson is
+promoted to a skill. Keep `git-workflow` and `powershell-patterns`, corrected
+against primary sources and focused on what agents get wrong.
 
-**Adding a new promotion category.**
-Edit the category routing table in `knowledge/issues/INDEX.md`. Add a row
-mapping the new category to its promotion target. If the target is a new skill,
-create the skill first.
+**Consequences.**
+Four skills instead of six. The registry was empty in every known installation,
+so this was the cheapest moment to rename. Upgraders follow
+[docs/upgrading.md](docs/upgrading.md); the installer lists 1.x leftovers rather
+than deleting them.
 
 ---
 
 ## References
 
 - Architectural Decision Records: https://adr.github.io/
-- MADR (Markdown Architectural Decision Records): https://adr.github.io/madr/
-- agentskills.io standard: https://agentskills.io
-- AGENTS.md standard (Agentic AI Foundation): https://agents.md/
-- VS Code custom instructions: https://code.visualstudio.com/docs/copilot/customization/custom-instructions
-- Claude Code memory and imports: https://code.claude.com/docs/en/memory
-- Conventional Commits v1.0.0: https://www.conventionalcommits.org/
-- Prompt caching (Anthropic): https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
-- Context window documentation (OpenAI): https://platform.openai.com/docs/models
+- MADR: https://adr.github.io/madr/
+- Agent Skills specification: https://agentskills.io/specification
+- AGENTS.md: https://agents.md/
+- Claude Code memory and `AGENTS.md`: https://code.claude.com/docs/en/memory
+- Claude Code skills: https://code.claude.com/docs/en/skills
+- Claude Code subagents: https://code.claude.com/docs/en/sub-agents
+- VS Code agent skills: https://code.visualstudio.com/docs/agent-customization/agent-skills
+- Codex skills: https://learn.chatgpt.com/docs/build-skills
+- Gemini CLI `GEMINI.md`: https://geminicli.com/docs/cli/gemini-md/
+- Gloaguen et al., "Evaluating AGENTS.md": https://arxiv.org/abs/2602.11988
+- Conventional Commits 1.0.0: https://www.conventionalcommits.org/en/v1.0.0/
