@@ -4,10 +4,12 @@
 # Editor / OS
 .vscode/
 .idea/
+.DS_Store
 Thumbs.db
 Desktop.ini
 *.swp
 
-# Claude Code local settings
-.claude/settings.local.json
-CLAUDE.local.md
+# Local agent state for whoever maintains this repository. The shipped
+# template/.claude/ directory is not affected: these patterns are anchored.
+/.claude/
+/CLAUDE.local.md

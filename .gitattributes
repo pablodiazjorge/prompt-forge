@@ -1,0 +1,7 @@
+# Store and check out text with LF everywhere, so file hashes, token counts and
+# the template drift check give the same answer on every platform.
+* text=auto eol=lf
+
+*.png binary
+*.gif binary
+*.jpg binary
